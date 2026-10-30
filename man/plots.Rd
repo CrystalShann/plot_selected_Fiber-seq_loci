@@ -18,7 +18,8 @@ profile groups; does not run clustering. FALSE uses sample, read start, RID orde
 \item{results}{A locus experiment or named SimpleList of locus experiments.}
 \item{directory}{New or empty output directory.}
 }
-\value{\code{plot_locus} returns a ComplexHeatmap Heatmap or ggplot object.
+\value{\code{plot_locus} returns a ComplexHeatmap Heatmap (heatmap), a ggplot
+(profile), or a patchwork composition of ggplots (footprints).
 \code{locus_profile} returns a DataFrame with one-based pos, base, group, cov,
 met, frac, smooth_cov and smooth_frac. \code{write_locus_results} returns the
 output directory invisibly.}
@@ -26,6 +27,17 @@ output directory invisibly.}
 with zero calls. Profiles use observed m6A positions and the tutorial sliding
 window; all-zero loci use all positions. Empty loci have NA fractions.
 Plots use the current assay columns and do not alter the experiment.
+Heatmaps use black m6A calls, genomic coordinate ticks and a dashed TSS line.
+The footprint composition stacks the accessibility profile, blue m6A calls,
+and overlaid FIRE (orange), nucleosome (dark blue), and TF footprint tracks
+(purple, magenta and cyan for the three supported size classes).
+Every read panel places sample annotations farthest left, followed by cluster
+annotations when enabled. Clusters use \code{\link{cluster_colors}} throughout.
+Sample colors use the Dynamic palette in sample-sheet label order.
+Clustered read panels split rows by cluster; within each cluster, sample,
+read start and read ID determine order. Coordinates increase left to right on
+both strands, as in the original extraction tutorial. On the minus strand,
+upstream of the TSS is to the right.
 
 Each locus output directory contains locus.rds (the complete experiment),
 m6a_matrix.rds, reads.tsv, qc.tsv and region.tsv. The unclustered directory

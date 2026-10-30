@@ -56,6 +56,36 @@ for (i in seq_along(a)) {
         all(profile$cov == ncol(x)))
 }
 # Exports retain native containers and identical unclustered profiles.
+stopifnot(identical(cluster_colors(c("cluster3", "cluster1")),
+    c(cluster3 = "green4", cluster1 = "dodgerblue2")),
+    identical(cluster_colors(factor("cluster3", levels = paste0("cluster", 1:3))),
+        c(cluster1 = "dodgerblue2", cluster2 = "#E31A1C", cluster3 = "green4")),
+    length(cluster_colors(character())) == 0L,
+    length(cluster_colors(paste0("cluster", 1:30))) == 30L)
+fail(cluster_colors(c("cluster1", NA)), "nonmissing")
+for (clustered in c(FALSE, TRUE)) {
+    h <- plot_locus(b[[1]], "heatmap", clustered = clustered)
+    stopifnot(identical(names(h@left_annotation@anno_list),
+        if (clustered) c("sample", "cluster") else "sample"),
+        identical(names(h@bottom_annotation@anno_list), c("coordinate", "TSS")))
+    composition <- plot_locus(b[[1]], "footprints", clustered = clustered)
+    stopifnot(inherits(composition, "patchwork"), length(composition) == 3L)
+    expected_order <- with(as.data.frame(colData(b[[1]])),
+        if (clustered) order(cluster, match(sample_name, example$samples$sample_name),
+            start, RID) else order(match(sample_name, example$samples$sample_name),
+            start, RID))
+    for (panel in c(2L, 3L)) {
+        layers <- composition[[panel]]$layers
+        bars <- layers[[which(vapply(layers, function(z)
+            "annotation_key" %in% names(z$data), logical(1)))]]$data
+        stopifnot(identical(levels(bars$RID), rev(colnames(b[[1]])[expected_order])))
+        if (clustered) stopifnot(
+            max(bars$annotation_x[grepl("^Sample:", bars$annotation_key)]) <
+            min(bars$annotation_x[grepl("^Cluster:", bars$annotation_key)]))
+        # Building also exercises facet/scale alignment with read metadata.
+        ggplot2::ggplot_build(composition[[panel]])
+    }
+}
 out <- tempfile("native-export-")
 write_locus_results(b, out)
 stopifnot(file.exists(file.path(out, "ALAS1", "clustered", "m6a_heatmap.pdf")))
@@ -108,6 +138,11 @@ stopifnot("no footprints called in the selected region" %in% filtered$messages,
 naked <- analyze_loci(ps[, c("sample_name", "m6a", "m6a_format")],
     pg[1], clustering = FALSE)[[1]]
 stopifnot(sum(lengths(colData(naked)$footprints)) == 0L)
+# Empty optional tracks and zero-call reads still render read backbones.
+for (result in list(naked, zero, filtered$value[[1]])) {
+    plot <- plot_locus(result, "footprints")
+    for (panel in seq_len(3L)) ggplot2::ggplot_build(plot[[panel]])
+}
 bad <- ps; bad$tf_format <- "bed6_per_sample"
 fail(validate_inputs(bad, pg), "Column count")
 bad <- ps; bad$tf <- tempfile("missing-track-")

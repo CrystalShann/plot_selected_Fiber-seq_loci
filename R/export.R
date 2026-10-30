@@ -64,7 +64,7 @@ write_locus_results <- function(results, directory) {
         detail[3] <- "no footprints called in the selected region"
     for (i in which(status == "written"))
         .save_plot(plot_locus(x, types[i], clustered),
-            file.path(directory, files[i]), if (i == 2L) 4 else 8)
+            file.path(directory, files[i]), c(10, 3.5, 14)[i])
     .write_table(data.frame(panel = types, status = status, detail = detail),
         file.path(directory, "manifest.tsv"))
 }

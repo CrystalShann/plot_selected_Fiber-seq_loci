@@ -16,7 +16,8 @@ Encoding: UTF-8
 Depends: R (>= 4.4.0)
 Imports: BiocGenerics, GenomeInfoDb, GenomicRanges, IRanges, S4Vectors,
     SummarizedExperiment, rtracklayer, Rsamtools, Matrix, data.table, dplyr,
-    igraph, withr, ggplot2, ComplexHeatmap, methods, stats, utils, grDevices
+    igraph, withr, ggplot2, ComplexHeatmap, methods, stats, utils, grDevices,
+    grid, patchwork, cowplot
 Suggests: knitr, rmarkdown, BiocCheck
 VignetteBuilder: knitr
 biocViews: Epigenetics, Sequencing, Clustering,

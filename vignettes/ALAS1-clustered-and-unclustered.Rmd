@@ -30,7 +30,7 @@ usage and numerical consistency; it is not a biological replicate study.
 The data provenance and reproducible subset-generation script accompany the
 package. The example files are a subset of the actual AL6 and AL8 LCL tracks.
 
-This tutorial executes all nine public functions. For field-by-field examples
+This tutorial executes all ten public functions. For field-by-field examples
 of the input files, see the companion **LCL input structures and function guide**
 (`vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")`).
 
@@ -43,7 +43,8 @@ of the input files, see the companion **LCL input structures and function guide*
 | `validate_inputs()` | Sample sheet and region ranges | Checks files, indexes, contigs and declared track formats |
 | `analyze_loci()` | Samples, regions and clustering choice | Named `SimpleList` of locus experiments |
 | `locus_profile()` | One locus experiment | Pooled or per-cluster fractions in a `DataFrame` |
-| `plot_locus()` | One locus experiment and panel type | Heatmap or ggplot object |
+| `plot_locus()` | One locus experiment and panel type | Heatmap, ggplot or patchwork composition |
+| `cluster_colors()` | Cluster labels or factor levels | Original cluster colors, shared by all plots |
 | `write_locus_results()` | One experiment or the results list | RDS objects, TSV tables and PDF panels |
 
 ## Load the package and writable example
@@ -113,13 +114,17 @@ parameters and the cluster graph remain in `metadata` as run provenance.
 Rows in the heatmap follow sample-sheet order, alignment start and read ID.
 The heatmap displays reads vertically and positions horizontally even though
 the underlying experiment uses the standard features-by-observations layout.
+The sample strip is farthest left; clustered views place the cluster strip
+next to it. Coordinate ticks and the orange dashed TSS marker follow the
+original plotting tutorial. Sample colors follow the sample sheet consistently
+across all read panels.
 
-```{r unclustered-heatmap, fig.height=6}
+```{r unclustered-heatmap, fig.height=10}
 ComplexHeatmap::draw(plot_locus(unclustered, "heatmap"))
 ```
 
 The pooled fraction divides by all full-span reads, including zero-call reads.
-Grey shows observed-position fractions; the colored curve uses the tutorial
+Grey shows observed-position fractions; the blue curve uses the tutorial
 10-bp sliding-window mean. The dashed line marks the supplied TSS.
 
 ```{r unclustered-profile}
@@ -129,10 +134,16 @@ head(locus_profile(unclustered))
 
 Optional tracks use nucleosomes of 130-160 bp and TF footprints in [10,30),
 [40,60), or [60,80) bp. FiberHMM TF blocks require a score of at least 50.
+The footprint figure stacks the accessibility profile, blue m6A reads, and
+overlaid FIRE/nucleosome/TF tracks, with relative panel heights 2:6:6.
+FIRE is orange, nucleosomes are dark blue, and the three TF size classes are
+purple, magenta and cyan. Both read panels include the same sample-first
+annotations and read order as the heatmap.
+
 A supplied footprint track with no retained calls raises the warning
 `no footprints called in the selected region`; the analysis still completes.
 
-```{r unclustered-footprints, fig.height=8}
+```{r unclustered-footprints, fig.height=14}
 plot_locus(unclustered, "footprints")
 ```
 
@@ -154,7 +165,16 @@ table(colData(clustered)$sample_label, colData(clustered)$cluster)
 metadata(clustered)$clustering_status
 ```
 
-```{r clustered-heatmap, fig.height=6}
+Cluster colors match the original Leiden plotting functions. Numeric IDs keep
+their colors when a cluster is absent from a subset. For custom figures, use
+the same palette (keep the complete factor levels for more than 25 clusters):
+
+```{r cluster-palette}
+cluster_colors(colData(clustered)$cluster)
+cluster_colors(c("cluster3", "cluster1"))
+```
+
+```{r clustered-heatmap, fig.height=10}
 ComplexHeatmap::draw(plot_locus(clustered, "heatmap", clustered = TRUE))
 ```
 
@@ -163,7 +183,7 @@ plot_locus(clustered, "profile", clustered = TRUE)
 head(locus_profile(clustered, by_cluster = TRUE))
 ```
 
-```{r clustered-footprints, fig.height=8}
+```{r clustered-footprints, fig.height=14}
 plot_locus(clustered, "footprints", clustered = TRUE)
 ```
 

@@ -17,7 +17,8 @@ remotes::install_github("CrystalShann/plot_selected_Fiber-seq_loci")
 
 
 ```r
-install.packages(c("Matrix", "data.table", "dplyr", "igraph", "withr", "ggplot2"))
+install.packages(c("Matrix", "data.table", "dplyr", "igraph", "withr", "ggplot2",
+    "patchwork", "cowplot"))
 install.packages("selectFiberseqLociWorkflow_0.99.0.tar.gz",
     repos = NULL, type = "source")
 ```
@@ -67,13 +68,26 @@ Each occupied bin contains each read's mean call across observed sites in
 that bin. `smoothing_bp = 10` separately controls profile smoothing. Changing
 the three clustering settings does not change the pooled profile.
 
-Two executable vignettes cover all nine public functions:
+Plots follow the original Fiber-seq tutorial's colors, themes, TSS markers and
+stacked profile/read/footprint layout. Read annotations place sample farthest
+left, followed by cluster. `cluster_colors(colData(clustered[["ALAS1"]])$cluster)`
+returns the same original cluster palette for use in your own figures.
+
+Two executable vignettes cover all ten public functions:
 
 - [ALAS1 with and without clustering](vignettes/ALAS1-clustered-and-unclustered.Rmd):
   all three plot types in both modes, adjustable clustering and result export.
 - [LCL input structures and function guide](vignettes/LCL-input-structures.Rmd):
   actual AL6/AL8 sample sheets and records, coordinates, annotations, optional
   tracks, and the mapping to `GRanges` and `SummarizedExperiment`.
+
+The additional [LCL fiber-seq data example](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.html)
+uses all 31 samples from the shared project at ALAS1, with unclustered and
+optional clustered panels. Its [R Markdown source](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.Rmd)
+uses the package functions with configurable paths and clustering settings.
+Reading the HTML requires no access to the shared files; re-running this
+particular example requires those files. The two bundled-data vignettes above
+remain portable.
 
 After installing a built release, open them with:
 

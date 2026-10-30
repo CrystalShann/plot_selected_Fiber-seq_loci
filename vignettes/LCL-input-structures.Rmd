@@ -37,7 +37,8 @@ for the full set of clustered and unclustered panels.
 | `validate_inputs()` | Sample sheet plus region `GRanges` | Invisible `TRUE`, or an informative error |
 | `analyze_loci()` | Samples, regions and explicit clustering choice | Named `SimpleList` of `RangedSummarizedExperiment` objects |
 | `locus_profile()` | One locus experiment | `DataFrame` of pooled or cluster-wise fractions |
-| `plot_locus()` | One locus experiment, panel type and view | `ComplexHeatmap::Heatmap` or ggplot object |
+| `plot_locus()` | One locus experiment, panel type and view | `ComplexHeatmap::Heatmap`, ggplot or patchwork composition |
+| `cluster_colors()` | Cluster labels or factor levels | Original cluster colors, shared by all plots |
 | `write_locus_results()` | One experiment or the whole results list | RDS, TSV and PDF files in a new or empty directory |
 
 ## 1. Copy the example into a writable directory
@@ -380,8 +381,11 @@ plot_locus(x, "profile")
 ```
 
 Use `plot_locus(x, "heatmap")` for a `ComplexHeatmap::Heatmap` object and draw
-it with `ComplexHeatmap::draw()`. `"profile"` and `"footprints"` return ggplot
-objects. The analysis vignette executes all three panel types in both modes.
+it with `ComplexHeatmap::draw()`. `"profile"` returns a ggplot;
+`"footprints"` returns a patchwork stack of the profile, m6A reads and
+overlaid FIRE/nucleosome/TF tracks. Both read panels place sample annotations
+farthest left, then cluster annotations. Colors, TSS markers and themes follow
+the original plotting tutorial. The analysis vignette executes all three panel types in both modes.
 
 Clustering controls are user-settable arguments. The defaults are
 **`window_size = 0`, `k_neighbors = 10`, `resolution = 1`**. Zero bin size means
@@ -404,6 +408,14 @@ stopifnot(identical(assay(x), assay(clustered)),
 binned <- analyze_loci(samples, alas1, clustering = TRUE,
     window_size = 50, k_neighbors = 5, resolution = 0.5)[["ALAS1"]]
 metadata(binned)$parameters[c("window_size", "k_neighbors", "resolution")]
+```
+
+Use the public palette helper to carry the original cluster colors into your
+own figures. Factor input retains all levels, including unobserved clusters.
+
+```{r cluster-palette}
+cluster_colors(colData(clustered)$cluster)
+cluster_colors(c("cluster3", "cluster1"))
 ```
 
 `plot_locus(clustered, "profile", clustered = TRUE)` uses a separate denominator

@@ -12,5 +12,12 @@
     "source_sha256": "22a4106aa8f1708e0f231d1d325b5bc9fb017ac217ce6c88fd69ff154f5aed42",
     "runtime": "R/shared-leiden_manhattan_functions.R",
     "runtime_sha256": "abace2bf0c01cd4b36e27ffc91bf1f823aecc36429eb2b2141df32ab7a3347c7"
+  },
+  {
+    "source_name": "plotting_functions.r",
+    "original": "code/parsing_functions/plotting_functions.r",
+    "source_sha256": "1a569bfdfcb6da0d2da9b1e0f148d83a16871d0d2fd10319a42e79ddfaa6b307",
+    "runtime": "R/shared-plotting_functions.R",
+    "runtime_sha256": "e51cb33000d33abb3f7b6acd4ce7b264ca3936a47cf9d72dc66dbf0882973d6e"
   }
 ]
