@@ -344,8 +344,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <div id="TOC">
 <ul>
-<li><a href="#package-overview">Package overview</a></li>
-<li><a href="#functions-by-task">Functions by task</a>
+<li><a href="#package-overview">Package overview</a>
 <ul>
 <li><a href="#prepare-sample-inputs">Prepare sample inputs</a></li>
 <li><a href="#select-genomic-regions">Select genomic regions</a></li>
@@ -411,13 +410,6 @@ footprints, and FIRE intervals. Human, plant and other genomes are
 supported when contig names and reference assemblies agree across
 inputs. The package reads processed tracks; it does not call methylation
 or footprints from raw sequencing data.</p>
-</div>
-<div id="functions-by-task" class="section level2">
-<h2>Functions by task</h2>
-<p>Each function below links to a short tutorial on this page. Run the
-tutorials in order for a complete analysis with the bundled LCL data.
-The reference layout follows the concise function summaries in the <a href="https://jianhong.github.io/trackViewer/reference/index.html">trackViewer
-reference</a>.</p>
 <div id="prepare-sample-inputs" class="section level3">
 <h3>Prepare sample inputs</h3>
 <table>
@@ -617,13 +609,49 @@ replace the paths in this example:</p>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">tf_format =</span> <span class="st">&quot;bed15_fiberhmm_tf&quot;</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>samples <span class="ot">&lt;-</span> <span class="fu">make_sample_sheet</span>(sample_table, <span class="at">output =</span> <span class="st">&quot;samples.tsv&quot;</span>)</span></code></pre></div>
-<p>For <code>sample_1</code> on <code>Chr5</code>, the first template
-resolves to <code>/data/sample_1/m6a.Chr5.bed.gz</code>. Only
-<code>{sample_name}</code> and <code>{chr}</code> are supported
-placeholders. Whole-genome files can use explicit paths without
-<code>{chr}</code>. Relative paths in a TSV are resolved against its
-directory; paths in an in-memory table use <code>base_dir</code>
-(default: the working directory).</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Example path</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>/data/sample_1/m6a.bed.gz</code></td>
+<td><strong>Give the full file location.</strong> Each sample needs its
+own path.</td>
+</tr>
+<tr class="even">
+<td><code>tracks/sample_1/m6a.bed.gz</code></td>
+<td><strong>Give the location relative to your sample sheet.</strong> If
+<code>samples.tsv</code> is in <code>/data/experiment/</code>, this
+means <code>/data/experiment/tracks/sample_1/m6a.bed.gz</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>/data/{sample_name}/m6a.bed.gz</code></td>
+<td><strong>Automatically choose the sample’s folder.</strong>
+<code>{sample_name}</code> is replaced by the sample ID in your sheet.
+For <code>sample_1</code>, this becomes
+<code>/data/sample_1/m6a.bed.gz</code>.</td>
+</tr>
+<tr class="even">
+<td><code>/data/{sample_name}/m6a.{chr}.bed.gz</code></td>
+<td><strong>Automatically choose the sample’s folder and chromosome
+file.</strong> Use this when each chromosome has a separate file. For
+<code>sample_1</code> and a region on <code>Chr5</code>, this becomes
+<code>/data/sample_1/m6a.Chr5.bed.gz</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Only <code>{sample_name}</code> and <code>{chr}</code> are supported
+placeholders. They select existing files; they do not create folders or
+split files. For a sample table created in R, relative paths start from
+<code>base_dir</code> (the working directory by default).</p>
 <p>Each supplied track must be sorted, bgzip-compressed and accompanied
 by a <code>.tbi</code> index. Omit optional columns or leave optional
 paths blank if no track is available. The supported format strings
