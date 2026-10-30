@@ -31,13 +31,6 @@ intervals. Human, plant and other genomes are supported when contig names and
 reference assemblies agree across inputs. The package reads processed tracks;
 it does not call methylation or footprints from raw sequencing data.
 
-## Functions by task
-
-Each function below links to a short tutorial on this page. Run the tutorials
-in order for a complete analysis with the bundled LCL data. The reference
-layout follows the concise function summaries in the
-[trackViewer reference](https://jianhong.github.io/trackViewer/reference/index.html).
-
 ### Prepare sample inputs
 
 | Function | What it does |
@@ -138,11 +131,16 @@ sample_table <- data.frame(
 samples <- make_sample_sheet(sample_table, output = "samples.tsv")
 ```
 
-For `sample_1` on `Chr5`, the first template resolves to
-`/data/sample_1/m6a.Chr5.bed.gz`. Only `{sample_name}` and `{chr}` are supported
-placeholders. Whole-genome files can use explicit paths without `{chr}`.
-Relative paths in a TSV are resolved against its directory; paths in an
-in-memory table use `base_dir` (default: the working directory).
+| Example path | Meaning |
+| --- | --- |
+| `/data/sample_1/m6a.bed.gz` | **Give the full file location.** Each sample needs its own path. |
+| `tracks/sample_1/m6a.bed.gz` | **Give the location relative to your sample sheet.** If `samples.tsv` is in `/data/experiment/`, this means `/data/experiment/tracks/sample_1/m6a.bed.gz`. |
+| `/data/{sample_name}/m6a.bed.gz` | **Automatically choose the sample’s folder.** `{sample_name}` is replaced by the sample ID in your sheet. For `sample_1`, this becomes `/data/sample_1/m6a.bed.gz`. |
+| `/data/{sample_name}/m6a.{chr}.bed.gz` | **Automatically choose the sample’s folder and chromosome file.** Use this when each chromosome has a separate file. For `sample_1` and a region on `Chr5`, this becomes `/data/sample_1/m6a.Chr5.bed.gz`. |
+
+Only `{sample_name}` and `{chr}` are supported placeholders. They select existing
+files; they do not create folders or split files. For a sample table created
+in R, relative paths start from `base_dir` (the working directory by default).
 
 Each supplied track must be sorted, bgzip-compressed and accompanied by a
 `.tbi` index. Omit optional columns or leave optional paths blank if no track

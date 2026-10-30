@@ -87,12 +87,12 @@ To include FIRE, add `fire` paths and `fire_format = "bed11_fire"`.
 
 Supported path styles include:
 
-| Path in the sample sheet | Interpretation |
+| Example path | Meaning |
 | --- | --- |
-| `/data/sample_1/m6a.bed.gz` | Explicit absolute path to a whole-genome file |
-| `tracks/sample_1/m6a.bed.gz` | Relative path; resolved against the TSV directory when loading a TSV, or `base_dir` for an in-memory table |
-| `/data/{sample_name}/m6a.bed.gz` | One whole-genome file per sample |
-| `/data/{sample_name}/m6a.{chr}.bed.gz` | One file per sample and contig |
+| `/data/sample_1/m6a.bed.gz` | **Give the full file location.** Each sample needs its own path. |
+| `tracks/sample_1/m6a.bed.gz` | **Give the location relative to your sample sheet.** If `samples.tsv` is in `/data/experiment/`, this means `/data/experiment/tracks/sample_1/m6a.bed.gz`. |
+| `/data/{sample_name}/m6a.bed.gz` | **Automatically choose the sample’s folder.** `{sample_name}` is replaced by the sample ID in your sheet. For `sample_1`, this becomes `/data/sample_1/m6a.bed.gz`. |
+| `/data/{sample_name}/m6a.{chr}.bed.gz` | **Automatically choose the sample’s folder and chromosome file.** Use this when each chromosome has a separate file. For `sample_1` and a region on `Chr5`, this becomes `/data/sample_1/m6a.Chr5.bed.gz`. |
 
 Only `{sample_name}` and `{chr}` placeholders are supported. For example,
 `/data/{sample_name}/m6a.{chr}.bed.gz` becomes
@@ -138,21 +138,19 @@ Coordinate strings are **one-based, inclusive**. For example:
 
 ```r
 regions <- prepare_regions(c("Chr5:1001-3000", "scaffold_42:4001-6000"))
-names(regions) <- c("plant_locus_1", "plant_locus_2")
+names(regions) <- c("locus_1", "locus_2")
 regions
 ```
 
-Replace these illustrative plant coordinates with your own. Contig names must
-match the tracks exactly, including case: `Chr5`, `chr5` and `5` are different.
-All coordinates and annotations must use the same reference assembly as the
-tracks. The returned object is a named `GRanges`.
+You can supply customized genomic coordinates for any loci of interest.
+Use the same reference assembly and chromosome names as your input files.
 
 You can also supply a **BED file**. For example, `regions.bed` can contain the
 following tab-separated rows, with no header:
 
 ```text
-Chr5	1000	3000	plant_locus_1
-scaffold_42	4000	6000	plant_locus_2
+Chr5	1000	3000	locus_1
+scaffold_42	4000	6000	locus_2
 ```
 
 BED uses **zero-based, half-open** coordinates: the first row above represents
@@ -169,7 +167,7 @@ Coordinate tables require an explicit convention:
 ```r
 # Equivalent table alternative:
 # regions <- prepare_regions(
-#     data.frame(region_id = "plant_locus_1", chr = "Chr5",
+#     data.frame(region_id = "locus_1", chr = "Chr5",
 #                start = 1001, end = 3000),
 #     coordinate_system = "one_based"
 # )
@@ -407,47 +405,6 @@ exported_locus <- list.files(
 restored <- readRDS(exported_locus)
 ```
 
-## Data model and invariants
-
-`analyze_loci()` returns a named `SimpleList` of `RangedSummarizedExperiment`
-objects. Every object's sparse `m6a` assay is **genomic positions × reads**.
-`rowRanges` is a single-base `GRanges` whose names/order match the assay rows.
-`colData` rownames and `RID` match the assay columns exactly. A read ID is
-namespaced as `sample_name::original_read_id`.
-
-`colData$read_range` is a `GRanges` column for full alignment coordinates;
-`colData$footprints` is a `GRangesList` column containing each read's footprint
-and FIRE ranges. `x[positions, reads]` keeps these read annotations aligned.
-All in-memory ranges and alignment coordinates are one-based inclusive;
-region TSV start/end use BED conventions. Footprint metadata specify RID,
-track and class. Row subsetting does not clip stored per-read intervals.
-
-`metadata(x)` contains original region, samples, QC, parameters and clustering
-provenance. Generic subsetting does not recompute this run provenance.
-`locus_profile(x)` recomputes fractions from the current experiment.
-
-Only the longest overlapping alignment per read is considered, and it must
-span the entire locus. Zero-call reads are retained in both matrices and
-pooled denominators. Unclustered ordering is sample-sheet order, read start,
-then read ID. Sparse zeros mean no observed call, not a measured unmethylated
-adenine at every genomic base. Tutorial profile smoothing uses observed-call
-positions; all-zero regions return zero profiles and empty regions NA profiles.
-
-Clustering adds assignments to `colData` without changing the assay or its
-order. Unclustered plots and pooled profiles are independent of clustering
-parameters. The cluster plot orders by cluster, sample, start and read ID.
-Clustering requires at least three reads and two occupied features. Exact
-Manhattan distances use quadratic memory in read count. This is Leiden
-clustering, not topic modelling.
-
-A supplied nucleosome or TF track with no retained calls emits exactly:
-
-> no footprints called in the selected region
-
-Analysis still completes, with empty per-read ranges and the status recorded.
-An omitted optional track does not trigger this warning. A supplied missing
-file is an input error.
-
 ## Output names
 
 ```text
@@ -477,16 +434,13 @@ results/ALAS1/
 
 ## Further tutorials
 
-Three executable vignettes cover all ten public functions:
+Two executable vignettes cover all ten public functions:
 
 - [Function reference and tutorials](vignettes/function-reference.Rmd):
   a package overview, functions grouped by task, and runnable examples for every
   public function.
 - [ALAS1 with and without clustering](vignettes/ALAS1-clustered-and-unclustered.Rmd):
   all three plot types in both modes, adjustable clustering and result export.
-- [Overview of the functions](vignettes/LCL-input-structures.Rmd):
-  actual AL6/AL8 sample sheets and records, coordinates, annotations, optional
-  tracks, and the mapping to `GRanges` and `SummarizedExperiment`.
 
 The additional [LCL fiber-seq data example](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.html)
 uses all 31 samples from the shared project at ALAS1, with unclustered and
@@ -501,7 +455,6 @@ After installing a built release, open them with:
 ```r
 vignette("function-reference", package = "selectFiberseqLociWorkflow")
 vignette("ALAS1-clustered-and-unclustered", package = "selectFiberseqLociWorkflow")
-vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")
 ```
 
 To include vignettes when installing from GitHub, set `build_vignettes = TRUE`
@@ -511,7 +464,6 @@ To knit local HTML previews from the package root after installing the package:
 ```r
 rmarkdown::render("vignettes/function-reference.Rmd")
 rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
-rmarkdown::render("vignettes/LCL-input-structures.Rmd")
 ```
 
 Local HTML previews are written beside their R Markdown sources and ignored

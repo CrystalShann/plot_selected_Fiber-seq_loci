@@ -30,9 +30,9 @@ usage and numerical consistency; it is not a biological replicate study.
 The data provenance and reproducible subset-generation script accompany the
 package. The example files are a subset of the actual AL6 and AL8 LCL tracks.
 
-This tutorial executes all ten public functions. For field-by-field examples
-of the input files, see the companion **Overview of the functions**
-(`vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")`).
+This tutorial executes all ten public functions. For a categorized guide with
+short examples, see **Function reference and tutorials**
+(`vignette("function-reference", package = "selectFiberseqLociWorkflow")`).
 
 | Function | Input | Result or purpose |
 |:--|:--|:--|
