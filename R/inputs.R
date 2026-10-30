@@ -5,15 +5,14 @@
   p <- path.expand(p)
   if (grepl("^(/|[A-Za-z]:[/\\\\])", p)) return(p)
   file.path(normalizePath(base, mustWork = TRUE), p)
-}
-# Replace sample and contig placeholders in paths.
+
 .expand_path <- function(p, sample, chr) {
   p <- gsub("{sample_name}", sample, p, fixed = TRUE)
   p <- gsub("{chr}", chr, p, fixed = TRUE)
   if (grepl("[{}]", p)) stop("Only {sample_name} and {chr} path placeholders are supported")
   p
 }
-# Validate sample fields and resolve track paths.
+# Validate sample fields and resolve track paths
 make_sample_sheet <- function(samples, output = NULL, base_dir = getwd()) {
   if (is.character(samples) && length(samples) == 1L) {
     base_dir <- dirname(normalizePath(samples, mustWork = TRUE))
@@ -56,7 +55,7 @@ validate_inputs <- function(samples, regions) {
                 if (!file.exists(p) || !file.exists(paste0(p, ".tbi")))
                     stop("Missing bgzip input or .tbi: ", p)
                 seqs <- Rsamtools::seqnamesTabix(p)
-                ## Optional tracks may legitimately have no calls on a contig.
+           
                 if (kind == "m6a" && !chr %in% seqs)
                     stop("Contig ", chr, " absent from ", p,
                         "; contig names must match exactly")
@@ -85,7 +84,7 @@ validate_inputs <- function(samples, regions) {
         stop("Column count does not match ", format, ": ", path)
 }
 
-# Copy bundled test data into a writable directory.
+# Copy test data into a writable directory
 example_data <- function(directory = tempfile("fiberseq-example-")) {
     if (dir.exists(directory) &&
         length(list.files(directory, all.files = TRUE, no.. = TRUE)))

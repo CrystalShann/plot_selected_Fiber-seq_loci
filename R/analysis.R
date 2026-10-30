@@ -1,4 +1,3 @@
-## Native R analysis. The assay is positions x reads throughout the public API.
 # Analyze selected loci with optional m6A clustering.
 analyze_loci <- function(samples, regions, clustering,
     window_size = 0, k_neighbors = 10, resolution = 1, seed = 1,
@@ -9,7 +8,8 @@ analyze_loci <- function(samples, regions, clustering,
         stop("Choose clustering = TRUE or FALSE explicitly")
     values <- list(window_size, k_neighbors, resolution, seed, nuc_min,
         nuc_max, min_tf_score, smoothing_bp)
-    # Check that each numeric parameter is valid.
+    
+    # check parameters
     valid <- vapply(values, function(v) is.numeric(v) && length(v) == 1L &&
         is.finite(v) && v >= 0, logical(1))
     if (!all(valid)) stop("Parameters must be finite nonnegative scalars")
@@ -24,14 +24,15 @@ analyze_loci <- function(samples, regions, clustering,
         k_neighbors = k_neighbors, resolution = resolution, seed = seed,
         nuc_min = nuc_min, nuc_max = nuc_max, min_tf_score = min_tf_score,
         smoothing_bp = smoothing_bp, tf_length_ranges = tf_length_ranges)
-    # Analyze each selected region independently.
+
+    # Analyze each selected region independently
     ans <- lapply(seq_along(regions), function(i)
         .analyze_region(samples, regions[i], parameters))
     names(ans) <- names(regions)
     S4Vectors::SimpleList(ans)
 }
 
-# Read full-span alignments and m6A calls for one sample.
+# Read full-span alignments and m6A calls for one sample
 .read_m6a_sample <- function(samples, i, region) {
     chr <- as.character(GenomicRanges::seqnames(region))
     path <- .expand_path(samples$m6a[i], samples$sample_name[i], chr)
@@ -102,7 +103,7 @@ analyze_loci <- function(samples, regions, clustering,
     result
 }
 
-# Add cluster assignments when enough features are available.
+# Add cluster assignments 
 .cluster_locus <- function(x, p) {
     mat <- SummarizedExperiment::assay(x, "m6a")
     observed <- Matrix::rowSums(mat) > 0
@@ -127,7 +128,7 @@ analyze_loci <- function(samples, regions, clustering,
     x
 }
 
-## Keep reproducibility local: the caller's RNG state is restored by withr.
+
 # Fit Manhattan-neighbor Leiden clusters and summarize them.
 .fit_clusters <- function(m, positions, p) {
     binned <- bin_read_matrix(m, min(positions), max(positions), p$window_size)

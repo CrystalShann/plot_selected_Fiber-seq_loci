@@ -1,6 +1,5 @@
-# Unchanged selections from code/parsing_functions/plotting_functions.r.
-# Source ranges and SHA256 checksums are recorded in inst/SHARED_*.
 
+# color palette for Leiden clusters
 LEIDEN_CLUSTER_COLORS <- c(
   "dodgerblue2", "#E31A1C", "green4", "#6A3D9A", "#FF7F00", "black", "gold1",
   "skyblue2", "#FB9A99", "palegreen2", "#CAB2D6", "#FDBF6F", "gray70", "khaki2",
@@ -19,7 +18,7 @@ cluster_palette <- function(levels) {
   stats::setNames(cols, levels)
 }
 
-# Match palette colors to numeric cluster IDs.
+# match palette colors to  cluster ID
 cluster_id_palette <- function(levels) {
   idx <- suppressWarnings(as.integer(sub("^cluster", "", levels)))
   if (anyNA(idx) || any(!grepl("^cluster[0-9]+$", levels))) idx <- seq_along(levels)
@@ -28,7 +27,7 @@ cluster_id_palette <- function(levels) {
   stats::setNames(cols, levels)
 }
 
-# Create a shared plot theme with optional overrides.
+# Create a shared plot theme 
 theme_fiberseq <- function(base = c("classic", "bw", "cowplot"),
                            base_size = 9, base_family = "", overrides = list()) {
   base <- match.arg(base)

@@ -1,4 +1,4 @@
-# Validate locus ranges, assay and read metadata.
+# Validate locus ranges, assay and read metadata
 .check_locus <- function(x) {
     if (!methods::is(x, "RangedSummarizedExperiment") ||
         !"m6a" %in% SummarizedExperiment::assayNames(x))
@@ -14,7 +14,7 @@
     invisible(TRUE)
 }
 
-# Calculate pooled or per-cluster m6A profiles.
+# Calculate pooled or per-cluster m6A profiles
 locus_profile <- function(x, by_cluster = FALSE) {
     .check_locus(x)
     m <- SummarizedExperiment::assay(x, "m6a")
@@ -54,7 +54,7 @@ locus_profile <- function(x, by_cluster = FALSE) {
         order(match(cd$sample_name, samples), cd$start, cd$RID)
 }
 
-# Create a heatmap, profile or footprint figure.
+# Create a heatmap, profile or footprint figure
 plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     clustered = FALSE) {
     .check_locus(x)
@@ -70,7 +70,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     .plot_profile(x, clustered)
 }
 
-# Plot pooled or per-cluster accessibility curves.
+# Plot pooled or per-cluster accessibility curves
 .plot_profile <- function(x, clustered, stacked = FALSE) {
     d <- as.data.frame(locus_profile(x, by_cluster = clustered))
     p <- ggplot2::ggplot(d, ggplot2::aes(x = pos, y = smooth_frac))
@@ -98,7 +98,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     .add_tss(p, x, linewidth = 0.5)
 }
 
-# Draw the m6A heatmap with read annotations.
+# Draw the m6A heatmap with read annotations
 .plot_heatmap <- function(x, clustered) {
     ord <- .read_order(x, clustered)
     cd <- SummarizedExperiment::colData(x)[ord, , drop = FALSE]
@@ -147,7 +147,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
         column_title_gp = grid::gpar(fontsize = 11))
 }
 
-# Stack accessibility, m6A and footprint panels.
+# Stack accessibility, m6A and footprint panels
 .plot_footprints <- function(x, clustered) {
     ord <- .read_order(x, clustered)
     cd <- SummarizedExperiment::colData(x)[ord, , drop = FALSE]
@@ -180,7 +180,8 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
             as.data.frame(S4Vectors::mcols(tracks)))
         d$RID <- factor(d$RID, levels = ids)
         d$cluster <- group[match(d$RID, cd$RID)]
-        ## Match plot_region_panels(): FIRE, nucleosomes, then TF on each read.
+
+        ## panel order: FIRE, nucleosomes, then TF on each read
         for (kind in c("fire", "nucleosome", "tf")) {
             footprints <- footprints + ggplot2::geom_segment(
                 data = d[d$track == kind & d$end >= d$start, , drop = FALSE],
@@ -206,14 +207,14 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     profile <- .plot_profile(x, clustered, stacked = TRUE) +
         ggplot2::labs(x = NULL, y = "m6A fraction", title = .locus_title(x),
             subtitle = .plot_subtitle(x, clustered))
-    ## Align genomic positions across all three panels; only read panels
-    ## contain sample and cluster strips in this left margin.
+
+    ## Align genomic positions across all three panels
     profile$coordinates <- ggplot2::coord_cartesian(
         xlim = .annotation_layout(x, clustered)$limits, expand = FALSE)
     patchwork::wrap_plots(profile, reads, footprints, ncol = 1,
         heights = c(2, 6, 6), guides = "collect")
 }
 
-## Names used by ggplot2 and unchanged shared dplyr expressions.
+
 utils::globalVariables(c("pos", "frac", "smooth_frac", "group", "start",
     "end", "RID", "class", "track", "read_start", "read_end"))
