@@ -62,10 +62,51 @@ library(SummarizedExperiment)
 library(GenomicRanges)
 ```
 
-Edit the YAML parameters at the top of this Rmd, or supply `params` to
-`rmarkdown::render()`. `clustering = FALSE` runs just the original unclustered
-analysis. `TRUE` adds a second run and its clustered panels. Bin width,
-neighbor count and resolution retain the package defaults below.
+### Edit the YAML parameters before knitting
+
+The YAML header is not displayed automatically in knitted HTML. The complete
+parameter block is reproduced here so HTML readers can see what to edit.
+Download or open `LCL-fiber-seq-data-example.Rmd`, edit its existing `params:`
+block between the opening `---` lines, save the Rmd, and knit it again.
+Editing the HTML will not change the analysis.
+
+```yaml
+params:
+  gene: "ALAS1"
+  flank_bp: 1000
+  sample_sheet: "/project/spott/1_Shared_projects/LCL_Fiber_seq/Data/LCL_sample_metatable_merged_samples_31samples.csv"
+  tss_bed: "/project/spott/cshan/annotations/gencodev46_Ensembl_canonical_TSS.bed"
+  tf_root: "/project/spott/1_Shared_projects/LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model"
+  clustering: true
+  window_size: 0
+  k_neighbors: 10
+  resolution: 1
+  seed: 1
+  nuc_min: 130
+  nuc_max: 160
+  min_tf_score: 50
+  smoothing_bp: 10
+  output_dir: null
+```
+
+Change `gene` to select another locus and update the three input paths for
+your files. YAML uses lowercase `true` and `false`: `clustering: false` runs
+only the unclustered analysis; `clustering: true` adds the clustered analysis.
+Set `output_dir` to a new or empty directory to retain results, or keep `null`
+to create a temporary directory. The bin width, neighbor count and resolution
+shown above are the current package defaults.
+
+Alternatively, override these values with the `params` argument to
+`rmarkdown::render()` (R uses uppercase `TRUE`, `FALSE` and `NULL`). For example:
+
+```{r edit-parameters-render, eval=FALSE}
+rmarkdown::render("LCL-fiber-seq-data-example.Rmd",
+    params = list(gene = "ALAS1", clustering = TRUE,
+        window_size = 50, k_neighbors = 5, resolution = 0.5,
+        output_dir = "LCL-ALAS1-custom-results"))
+```
+
+The following table records the settings actually used for this knitted run.
 
 ```{r settings}
 gene <- params$gene
