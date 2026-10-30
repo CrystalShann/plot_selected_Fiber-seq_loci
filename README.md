@@ -15,8 +15,6 @@ BiocManager::install(c("BiocGenerics", "GenomeInfoDb", "GenomicRanges",
 remotes::install_github("CrystalShann/plot_selected_Fiber-seq_loci")
 ```
 
-For a versioned source release, download the tarball and its SHA256 checksum,
-verify the checksum, and install after satisfying the dependencies in DESCRIPTION:
 
 ```r
 install.packages(c("Matrix", "data.table", "dplyr", "igraph", "withr", "ggplot2"))
