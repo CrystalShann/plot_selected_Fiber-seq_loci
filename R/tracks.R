@@ -1,6 +1,8 @@
+# Validate inclusive, nonoverlapping TF length ranges.
 .validate_tf_length_ranges <- function(ranges) {
     if (is.null(ranges)) return(invisible(NULL))
     valid <- is.list(ranges) && length(ranges) > 0L &&
+        # Check each length pair for positive integer bounds.
         all(vapply(ranges, function(r) is.numeric(r) && length(r) == 2L &&
             all(is.finite(r)) && all(r >= 1) && all(r == floor(r)) &&
             r[1] <= r[2], logical(1)))
@@ -14,11 +16,15 @@
     invisible(NULL)
 }
 
+# Collect optional footprint tracks for retained reads.
 .read_tracks <- function(samples, reads, region, parameters) {
     kinds <- intersect(c("nucleosome", "tf", "fire"), names(samples))
+    # Keep only optional tracks with supplied paths.
     kinds <- kinds[vapply(kinds, function(k)
         any(!is.na(samples[[k]]) & nzchar(samples[[k]])), logical(1))]
+    # Combine samples for each supplied track type.
     tracks <- lapply(kinds, function(kind) {
+        # Read this track type for each sample.
         pieces <- lapply(seq_len(nrow(samples)), function(i)
             .read_track_sample(samples, i, reads, region, kind, parameters))
         if (length(pieces)) do.call(c, pieces) else GenomicRanges::GRanges()
@@ -39,6 +45,7 @@
     list(by_read = by_read, supplied = kinds, empty = empty)
 }
 
+# Load and filter one sample’s footprint track.
 .read_track_sample <- function(samples, i, reads, region, kind, p) {
     path <- samples[[kind]][i]
     empty <- GenomicRanges::GRanges()

@@ -1,16 +1,19 @@
 .formats <- list(m6a = "bed12_fibertools", nucleosome = c("bed12_fibertools", "bed13_fiberhmm"),
                  tf = c("bed15_fiberhmm_tf", "bed6_per_sample"), fire = "bed11_fire")
+# Resolve a file path against its base directory.
 .absolute <- function(p, base = getwd()) {
   p <- path.expand(p)
   if (grepl("^(/|[A-Za-z]:[/\\\\])", p)) return(p)
   file.path(normalizePath(base, mustWork = TRUE), p)
 }
+# Replace sample and contig placeholders in paths.
 .expand_path <- function(p, sample, chr) {
   p <- gsub("{sample_name}", sample, p, fixed = TRUE)
   p <- gsub("{chr}", chr, p, fixed = TRUE)
   if (grepl("[{}]", p)) stop("Only {sample_name} and {chr} path placeholders are supported")
   p
 }
+# Validate sample fields and resolve track paths.
 make_sample_sheet <- function(samples, output = NULL, base_dir = getwd()) {
   if (is.character(samples) && length(samples) == 1L) {
     base_dir <- dirname(normalizePath(samples, mustWork = TRUE))
@@ -37,6 +40,7 @@ make_sample_sheet <- function(samples, output = NULL, base_dir = getwd()) {
   S4Vectors::DataFrame(samples)
 }
 
+# Check track files, indexes, formats and contigs.
 validate_inputs <- function(samples, regions) {
     samples <- make_sample_sheet(samples)
     regions <- prepare_regions(regions)
@@ -67,6 +71,7 @@ validate_inputs <- function(samples, regions) {
     invisible(TRUE)
 }
 
+# Check track column counts and empty-file rules.
 .validate_track_header <- function(path, format, expected, kind) {
     con <- gzfile(path, open = "rt")
     on.exit(close(con))
@@ -80,6 +85,7 @@ validate_inputs <- function(samples, regions) {
         stop("Column count does not match ", format, ": ", path)
 }
 
+# Copy bundled test data into a writable directory.
 example_data <- function(directory = tempfile("fiberseq-example-")) {
     if (dir.exists(directory) &&
         length(list.files(directory, all.files = TRUE, no.. = TRUE)))

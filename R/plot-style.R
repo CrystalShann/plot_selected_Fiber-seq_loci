@@ -1,3 +1,4 @@
+# Return consistent colors for cluster labels.
 cluster_colors <- function(clusters) {
     labels <- if (is.factor(clusters)) levels(clusters) else
         unique(as.character(clusters))
@@ -8,22 +9,27 @@ cluster_colors <- function(clusters) {
         cluster_id_palette(labels) else cluster_palette(labels)
 }
 
+# Assign colors to sample labels.
 .sample_colors <- function(x) {
     labels <- unique(S4Vectors::metadata(x)$samples$sample_label)
     stats::setNames(grDevices::hcl.colors(length(labels), "Dynamic"), labels)
 }
 
+# Label the genomic axis with contig names.
 .axis_label <- function(x) paste(unique(as.character(
     GenomicRanges::seqnames(SummarizedExperiment::rowRanges(x)))), "(1-based)")
 
+# Get the displayed genomic coordinate limits.
 .plot_bounds <- function(x) range(BiocGenerics::start(
     SummarizedExperiment::rowRanges(x)))
 
+# Retrieve the locus TSS when available.
 .plot_tss <- function(x) {
     tss <- S4Vectors::mcols(S4Vectors::metadata(x)$region)$tss
     if (length(tss) == 1L && !is.na(tss)) tss else NA_integer_
 }
 
+# Add a dashed TSS line to a plot.
 .add_tss <- function(p, x, linewidth = 0.4) {
     tss <- .plot_tss(x)
     if (!is.na(tss)) p <- p + ggplot2::geom_vline(xintercept = tss,
@@ -31,11 +37,13 @@ cluster_colors <- function(clusters) {
     p
 }
 
+# Build a title from the locus name.
 .locus_title <- function(x) {
     r <- S4Vectors::metadata(x)$region
     paste0(names(r), if (!is.na(.plot_tss(x))) " promoter" else " locus")
 }
 
+# Describe read counts and plotting order.
 .plot_subtitle <- function(x, clustered) {
     sprintf("%d full-span reads; ordered by %ssample, read start and read ID; dashed = TSS",
         ncol(x), if (clustered) "cluster, then " else "")
@@ -43,6 +51,7 @@ cluster_colors <- function(clusters) {
 
 ## The original tutorial keeps genomic coordinates on both strands.
 ## Annotation strips occupy a separate margin left of the genomic window.
+# Position sample and cluster strips beside reads.
 .annotation_layout <- function(x, clustered) {
     bounds <- .plot_bounds(x)
     span <- max(1, diff(bounds))
@@ -52,6 +61,7 @@ cluster_colors <- function(clusters) {
         limits = c(min(centers) - span * 0.02, bounds[2]))
 }
 
+# Add colored sample and cluster annotations.
 .read_annotations <- function(p, x, cd, clustered) {
     layout <- .annotation_layout(x, clustered)
     data <- data.frame(RID = cd$RID, cluster = if (clustered) cd$cluster else "All",
@@ -78,6 +88,7 @@ cluster_colors <- function(clusters) {
             guide = ggplot2::guide_legend(ncol = 2, order = 1))
 }
 
+# Style read panels, coordinate axes and TSS markers.
 .read_panel <- function(p, x, cd, clustered, ylabel) {
     if (clustered) p <- p + ggplot2::facet_grid(cluster ~ .,
         scales = "free_y", space = "free_y")
@@ -86,6 +97,7 @@ cluster_colors <- function(clusters) {
     ticks <- ticks[ticks >= bounds[1] & ticks <= bounds[2]]
     p <- .read_annotations(p, x, cd, clustered) +
         ggplot2::scale_x_continuous(breaks = ticks,
+            # Format coordinate ticks with thousands separators.
             labels = function(v) format(v, big.mark = ",", scientific = FALSE)) +
         ggplot2::scale_y_discrete(drop = TRUE) +
         ggplot2::coord_cartesian(xlim = .annotation_layout(x, clustered)$limits,

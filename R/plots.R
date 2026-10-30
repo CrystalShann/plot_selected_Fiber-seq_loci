@@ -1,3 +1,4 @@
+# Validate locus ranges, assay and read metadata.
 .check_locus <- function(x) {
     if (!methods::is(x, "RangedSummarizedExperiment") ||
         !"m6a" %in% SummarizedExperiment::assayNames(x))
@@ -13,6 +14,7 @@
     invisible(TRUE)
 }
 
+# Calculate pooled or per-cluster m6A profiles.
 locus_profile <- function(x, by_cluster = FALSE) {
     .check_locus(x)
     m <- SummarizedExperiment::assay(x, "m6a")
@@ -26,6 +28,7 @@ locus_profile <- function(x, by_cluster = FALSE) {
     observed <- Matrix::rowSums(m) > 0
     if (!any(observed)) observed[] <- TRUE
     p <- pos[observed]
+    # Calculate fractions and smoothing for each read group.
     out <- lapply(names(groups), function(g) {
         idx <- groups[[g]]
         met <- as.numeric(Matrix::rowSums(m[observed, idx, drop = FALSE]))
@@ -40,6 +43,7 @@ locus_profile <- function(x, by_cluster = FALSE) {
     do.call(rbind, out)
 }
 
+# Order reads by cluster, sample and alignment.
 .read_order <- function(x, clustered) {
     cd <- SummarizedExperiment::colData(x)
     samples <- S4Vectors::metadata(x)$samples$sample_name
@@ -50,6 +54,7 @@ locus_profile <- function(x, by_cluster = FALSE) {
         order(match(cd$sample_name, samples), cd$start, cd$RID)
 }
 
+# Create a heatmap, profile or footprint figure.
 plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     clustered = FALSE) {
     .check_locus(x)
@@ -65,6 +70,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     .plot_profile(x, clustered)
 }
 
+# Plot pooled or per-cluster accessibility curves.
 .plot_profile <- function(x, clustered, stacked = FALSE) {
     d <- as.data.frame(locus_profile(x, by_cluster = clustered))
     p <- ggplot2::ggplot(d, ggplot2::aes(x = pos, y = smooth_frac))
@@ -92,6 +98,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
     .add_tss(p, x, linewidth = 0.5)
 }
 
+# Draw the m6A heatmap with read annotations.
 .plot_heatmap <- function(x, clustered) {
     ord <- .read_order(x, clustered)
     cd <- SummarizedExperiment::colData(x)[ord, , drop = FALSE]
@@ -115,6 +122,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
         labels_gp = grid::gpar(fontsize = 8, col = "#D55E00"))
     bottom$annotation_name_gp <- grid::gpar(fontsize = 8)
     ## Draw once per cluster slice, also when callers use draw() themselves.
+    # Draw the TSS marker within each heatmap slice.
     tss_line <- function(j, i, x, y, width, height, fill) {
         if (!is.na(tss_col)) grid::grid.lines(
             x = rep((tss_col - 0.5) / ncol(m), 2), y = c(0, 1),
@@ -139,6 +147,7 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
         column_title_gp = grid::gpar(fontsize = 11))
 }
 
+# Stack accessibility, m6A and footprint panels.
 .plot_footprints <- function(x, clustered) {
     ord <- .read_order(x, clustered)
     cd <- SummarizedExperiment::colData(x)[ord, , drop = FALSE]

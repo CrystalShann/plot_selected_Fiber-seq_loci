@@ -8,6 +8,7 @@ LEIDEN_CLUSTER_COLORS <- c(
   "green1", "yellow4", "yellow3", "darkorange4", "brown"
 )
 
+# Assign palette colors to cluster levels.
 cluster_palette <- function(levels) {
   n <- length(levels)
   cols <- if (n <= length(LEIDEN_CLUSTER_COLORS)) {
@@ -18,6 +19,7 @@ cluster_palette <- function(levels) {
   stats::setNames(cols, levels)
 }
 
+# Match palette colors to numeric cluster IDs.
 cluster_id_palette <- function(levels) {
   idx <- suppressWarnings(as.integer(sub("^cluster", "", levels)))
   if (anyNA(idx) || any(!grepl("^cluster[0-9]+$", levels))) idx <- seq_along(levels)
@@ -26,6 +28,7 @@ cluster_id_palette <- function(levels) {
   stats::setNames(cols, levels)
 }
 
+# Create a shared plot theme with optional overrides.
 theme_fiberseq <- function(base = c("classic", "bw", "cowplot"),
                            base_size = 9, base_family = "", overrides = list()) {
   base <- match.arg(base)

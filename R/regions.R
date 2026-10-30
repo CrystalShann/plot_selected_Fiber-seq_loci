@@ -1,4 +1,5 @@
 # All public region tables use BED coordinates plus explicit analysis coordinates.
+# Optionally save a table as a TSV file.
 .write_table <- function(x, output) {
   if (!is.null(output)) {
     dir.create(dirname(output), recursive = TRUE, showWarnings = FALSE)
@@ -6,13 +7,16 @@
   }
   x
 }
+# Read a headered TSV with blank values as missing.
 .read_table <- function(path) utils::read.delim(path, stringsAsFactors = FALSE,
                                               check.names = FALSE, na.strings = "")
 ## rtracklayer handles GTF quoting and GFF3 attribute encoding.
+# Extract transcript coordinates and gene relationships.
 .annotation <- function(path, canonical_attribute = NULL, canonical_value = NULL) {
     gr <- rtracklayer::import(path)
     mc <- S4Vectors::mcols(gr)
     gff <- "ID" %in% names(mc)
+    # Flatten annotation attributes into character values.
     attr <- function(key) {
         if (!key %in% names(mc)) return(rep("", length(gr)))
         vapply(as.list(mc[[key]]), paste, character(1), collapse = ",")
@@ -41,11 +45,13 @@
     d$tss <- ifelse(d$strand == "+", d$start1, d$end1)
     if (!is.null(canonical_attribute)) {
         values <- strsplit(attr(canonical_attribute)[tx], ",", fixed = TRUE)
+        # Flag transcripts carrying the requested canonical tag.
         d$canonical <- vapply(values, function(x) canonical_value %in% x,
             logical(1))
     }
     d
 }
+# Select requested genes or transcripts.
 .select_annotation <- function(d, genes, transcripts) {
   if (!is.null(genes)) {
     missing <- setdiff(genes, c(d$gene_id, d$gene_name))
@@ -60,9 +66,11 @@
   if (!nrow(d)) stop("No selected transcripts")
   d
 }
+# Build promoter windows around distinct gene TSSs.
 .tss_regions <- function(d, flank_bp) {
   if (length(flank_bp) != 1 || is.na(flank_bp) || flank_bp < 0 || flank_bp != floor(flank_bp)) stop("Invalid flank_bp")
   key <- paste(d$gene_id, d$chr, d$tss, d$strand, sep = "|")
+  # Merge transcripts sharing a gene, strand and TSS.
   rows <- lapply(unique(key), function(k) {
     z <- d[key == k, ]; r <- z[1, ]
     data.frame(region_id = paste(r$gene_id, r$chr, r$tss, r$strand, sep = "_"),
@@ -73,6 +81,7 @@
   })
   do.call(rbind, rows)
 }
+# Validate coordinates and standardize region metadata.
 .normalize_regions <- function(d) {
   if (!all(c("chr", "start", "end") %in% names(d))) stop("Regions require chr, start, end")
   d$start <- as.numeric(d$start); d$end <- as.numeric(d$end)
@@ -97,6 +106,7 @@
   d
 }
 
+# Convert coordinates or annotations to named genomic ranges.
 prepare_regions <- function(regions = NULL, output = NULL, coordinate_system = NULL,
                             annotation = NULL, genes = NULL, transcripts = NULL,
                             flank_bp = 1000, bed_annotation = c("plain", "gencode_custom")) {
@@ -144,6 +154,7 @@ prepare_regions <- function(regions = NULL, output = NULL, coordinate_system = N
   .regions_gr(d, output)
 }
 
+# Select canonical transcript TSSs or promoter windows.
 extract_canonical_tss <- function(annotation, output = NULL, genes = NULL,
                                   attribute = "tag", value = "Ensembl_canonical", flank_bp = 0) {
   d <- .select_annotation(.annotation(annotation, attribute, value), genes, NULL)
@@ -154,6 +165,7 @@ extract_canonical_tss <- function(annotation, output = NULL, genes = NULL,
 }
 
 ## BED exists only at the import/export boundary. Public ranges are 1-based.
+# Convert a BED-coordinate table to genomic ranges.
 .regions_gr <- function(d, output = NULL) {
     d <- .normalize_regions(d)
     .write_table(d, output)
@@ -168,6 +180,7 @@ extract_canonical_tss <- function(annotation, output = NULL, genes = NULL,
     gr
 }
 
+# Convert genomic ranges to a normalized BED-coordinate table.
 .regions_table <- function(gr) {
     if (!methods::is(gr, "GRanges")) stop("regions must be a GRanges")
     d <- as.data.frame(S4Vectors::mcols(gr))

@@ -1,3 +1,4 @@
+# Average per-read calls within occupied genomic bins.
 bin_read_matrix <- function(met_mat, region_start, region_end, window_size = 0) {
   M   <- as.matrix(met_mat)
   pos <- as.integer(colnames(M))
@@ -31,6 +32,7 @@ bin_read_matrix <- function(met_mat, region_start, region_end, window_size = 0) 
   list(mat = mat, window_anno = anno, window_size = window_size)
 }
 
+# Build a weighted Manhattan nearest-neighbor graph.
 manhattan_knn_graph <- function(mat, k_neighbors = 50, sigma = NULL, verbose = TRUE) {
   n <- nrow(mat)
   if (n < 3) stop("fewer than 3 reads to cluster")
@@ -47,6 +49,7 @@ manhattan_knn_graph <- function(mat, k_neighbors = 50, sigma = NULL, verbose = T
   diag(D) <- Inf
 
   # k nearest neighbours of every read
+  # Choose the nearest neighbors for each read.
   nn <- t(apply(D, 1, function(d) order(d)[seq_len(k_eff)]))
   # turn the neighbor table into pairs
   from <- rep(seq_len(n), each = k_eff)
@@ -90,13 +93,16 @@ manhattan_knn_graph <- function(mat, k_neighbors = 50, sigma = NULL, verbose = T
        mean_knn_dist = mean(d_nn), dist = D)
 }
 
+# Number clusters from largest to smallest.
 relabel_clusters_by_size <- function(membership) {
   ord <- names(sort(table(membership), decreasing = TRUE))
   factor(paste0("cluster", match(as.character(membership), ord)),
          levels = paste0("cluster", seq_along(ord)))
 }
 
+# Calculate mean feature values for each cluster.
 cluster_feature_profiles <- function(feat_mat, cluster, na.rm = TRUE) {
+  # Average feature values within each cluster.
   profiles <- t(sapply(levels(cluster), function(cl)
     colMeans(feat_mat[cluster == cl, , drop = FALSE], na.rm = na.rm)))
   colnames(profiles) <- colnames(feat_mat)

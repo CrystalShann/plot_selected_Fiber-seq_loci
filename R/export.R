@@ -1,3 +1,4 @@
+# Export locus experiments, summaries and figures.
 write_locus_results <- function(results, directory) {
     if (methods::is(results, "RangedSummarizedExperiment"))
         results <- S4Vectors::SimpleList(stats::setNames(list(results),
@@ -40,6 +41,7 @@ write_locus_results <- function(results, directory) {
     invisible(normalizePath(directory))
 }
 
+# Save view-specific plots, profiles and a manifest.
 .write_panels <- function(x, directory, clustered) {
     dir.create(directory, showWarnings = FALSE)
     ord <- .read_order(x, clustered)
@@ -69,6 +71,7 @@ write_locus_results <- function(results, directory) {
         file.path(directory, "manifest.tsv"))
 }
 
+# Write a heatmap or ggplot figure to PDF.
 .save_plot <- function(plot, path, height) {
     grDevices::pdf(path, width = 10, height = height)
     on.exit(grDevices::dev.off())

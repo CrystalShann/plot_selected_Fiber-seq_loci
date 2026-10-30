@@ -1,3 +1,4 @@
+# Read indexed track records overlapping a region.
 read_tabix_region <- function(ft_extracted_file, region_gr) {
   tabix_index <- Rsamtools::TabixFile(ft_extracted_file)
   compressed_records <- Rsamtools::scanTabix(tabix_index, param = region_gr)
@@ -16,6 +17,7 @@ read_tabix_region <- function(ft_extracted_file, region_gr) {
   )
 }
 
+# Return the column count for a declared format.
 footprint_format_columns <- function(format) {
   columns <- c(bed12_fibertools = 12L, bed13_fiberhmm = 13L,
                bed15_fiberhmm_tf = 15L, bed6_per_sample = 6L, bed4_pooled = 4L)
@@ -24,11 +26,13 @@ footprint_format_columns <- function(format) {
   unname(columns[[format]])
 }
 
+# Report a footprint file column-count mismatch.
 footprint_column_error <- function(path, format, actual) {
   stop("Footprint file ", path, " (configured format '", format, "'): expected ",
        footprint_format_columns(format), " columns, found ", actual, call. = FALSE)
 }
 
+# Keep the longest alignment for each read.
 keep_longest_alignment <- function(df) {
   df <- as.data.frame(df)
   if (!nrow(df)) return(df)
@@ -36,6 +40,7 @@ keep_longest_alignment <- function(df) {
   df[!duplicated(df$RID), , drop = FALSE]
 }
 
+# Load fibertools BED12 records for selected reads.
 read_ft_bed12 <- function(bed_file, region = NULL, longest_alignment = FALSE) {
   if (is.null(region)) {
     df <- data.table::fread(bed_file, header = FALSE)
@@ -52,6 +57,7 @@ read_ft_bed12 <- function(bed_file, region = NULL, longest_alignment = FALSE) {
   return(df)
 }
 
+# Expand footprint blocks into individual BED intervals.
 convert_ft_bed12_to_bed6 <- function(bed12_df, include_read_start_end = FALSE,
                                    drop_sentinels = TRUE, keep_block_scores = FALSE,
                                    format = NULL, source = NULL,
@@ -143,7 +149,9 @@ convert_ft_bed12_to_bed6 <- function(bed12_df, include_read_start_end = FALSE,
   return(as.data.frame(bed6_df))
 }
 
+# Average values within centered genomic windows.
 smooth_mean_slidewindow <- function(x, pos, n = 20) {
+  # Average neighboring values around each position.
   sapply(pos, function(i) mean(x[which(pos >= (i - n / 2) & pos <= (i + n / 2))]))
 }
 
