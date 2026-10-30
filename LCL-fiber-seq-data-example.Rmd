@@ -1,0 +1,424 @@
+---
+title: "LCL fiber-seq data example"
+author: "Crystal Shan"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    self_contained: true
+params:
+  gene: "ALAS1"
+  flank_bp: 1000
+  sample_sheet: "/project/spott/1_Shared_projects/LCL_Fiber_seq/Data/LCL_sample_metatable_merged_samples_31samples.csv"
+  tss_bed: "/project/spott/cshan/annotations/gencodev46_Ensembl_canonical_TSS.bed"
+  tf_root: "/project/spott/1_Shared_projects/LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model"
+  clustering: true
+  window_size: 0
+  k_neighbors: 10
+  resolution: 1
+  seed: 1
+  nuc_min: 130
+  nuc_max: 160
+  min_tf_score: 50
+  smoothing_bp: 10
+  output_dir: null
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = TRUE,
+    error = FALSE, fig.width = 10, fig.height = 6)
+```
+
+## What this tutorial reproduces
+
+This is the package-based counterpart of
+`fiber-seq/code/parsing_functions/extract_m6a_tutorial.rmd`. It reads the same
+**31-sample LCL metadata CSV**, full processed tracks in the shared project,
+and ALAS1 TSS from the same GENCODE v46 BED. It uses all available full-span
+reads at the selected locus; it does not use the small bundled example or cap
+the reads per sample.
+
+The first analysis reproduces the original unclustered workflow: a sparse m6A
+assay, heatmap, pooled accessibility profile, and matching nucleosome,
+FiberHMM TF-footprint and FIRE tracks. An optional second analysis shows
+Manhattan/Leiden clusters for exactly the same reads. Both views use public
+functions from `selectFiberseqLociWorkflow`; no analysis scripts are sourced.
+
+This tutorial requires access to the shared files. The published HTML includes
+its executed output and plots and can be read without that access. For a
+portable input dataset, see the package's `example_data()` tutorials.
+
+## 1. Load the installed package and choose settings
+
+Install the package and dependencies using its README before knitting. The
+tutorial itself does not install anything. It uses Rsamtools through the
+package to read tabix-indexed tracks; an external `tabix` executable is not
+needed.
+
+```{r libraries}
+library(selectFiberseqLociWorkflow)
+library(SummarizedExperiment)
+library(GenomicRanges)
+```
+
+Edit the YAML parameters at the top of this Rmd, or supply `params` to
+`rmarkdown::render()`. `clustering = FALSE` runs just the original unclustered
+analysis. `TRUE` adds a second run and its clustered panels. Bin width,
+neighbor count and resolution retain the package defaults below.
+
+```{r settings}
+gene <- params$gene
+flank_bp <- params$flank_bp
+knitr::kable(data.frame(
+    setting = c("gene", "flank_bp", "clustering", "window_size",
+        "k_neighbors", "resolution", "seed", "nuc_min", "nuc_max",
+        "min_tf_score", "smoothing_bp"),
+    value = vapply(params[c("gene", "flank_bp", "clustering", "window_size",
+        "k_neighbors", "resolution", "seed", "nuc_min", "nuc_max",
+        "min_tf_score", "smoothing_bp")], as.character, character(1))))
+
+# With output_dir = NULL, write a new temporary result directory.
+# Set output_dir to a new persistent directory when retaining an analysis.
+run_dir <- if (is.null(params$output_dir)) {
+    tempfile(paste0("LCL-", gene, "-"))
+} else {
+    path.expand(params$output_dir)
+}
+if (dir.exists(run_dir) &&
+    length(list.files(run_dir, all.files = TRUE, no.. = TRUE))) {
+    stop("Choose a new or empty output_dir to avoid replacing an earlier run")
+}
+dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
+run_dir <- normalizePath(run_dir, mustWork = TRUE)
+```
+
+`window_size = 0` uses individual observed m6A sites for clustering. A positive
+integer, such as `50`, averages calls across observed sites in each occupied
+bin of that width in bp. `k_neighbors = 10` requests ten Manhattan nearest
+neighbors per read, capped at the number of reads minus one.
+`resolution = 1` is the Leiden resolution; larger values generally favor
+finer partitions. `smoothing_bp = 10` independently controls profile smoothing.
+The stored assay remains at single-base resolution for every bin width.
+
+## 2. Convert the shared sample metadata to a package sample sheet
+
+The original CSV contains many analysis columns. Only `sample_name` and
+`fire_dir` are needed here. The sample-sheet order is retained for plotting.
+The short sample label comes from the part before the first underscore.
+
+```{r sample-metadata}
+if (!file.exists(params$sample_sheet)) {
+    stop("Shared sample metadata not found: ", params$sample_sheet)
+}
+sample_metadata <- read.csv(params$sample_sheet, stringsAsFactors = FALSE)
+stopifnot(all(c("sample_name", "fire_dir") %in% names(sample_metadata)))
+sample_metadata <- sample_metadata[, c("sample_name", "fire_dir")]
+knitr::kable(head(sample_metadata, 3), row.names = FALSE)
+```
+
+These are the same four processed track sources used in the original tutorial:
+
+| Track | Location | Declared format |
+|:--|:--|:--|
+| m6A | `<fire_dir>/extracted_results/m6a_by_chr/<sample>.ft_extracted_m6a.<chr>.bed.gz` | `bed12_fibertools` |
+| Nucleosome | `<fire_dir>/extracted_results/nuc_by_chr/<sample>.ft_extracted_nuc.<chr>.bed.gz` | `bed12_fibertools` |
+| TF footprint | `<tf_root>/<sample>/<sample>.recalled_tf.bed.gz` | `bed15_fiberhmm_tf` |
+| FIRE | `<fire_dir>/additional-outputs-v0.1/fire-peaks/<sample>-v0.1-fire-elements.bed.gz` | `bed11_fire` |
+
+Each file needs its adjacent `.tbi` index. The format is explicit, not guessed
+from the caller name or filename. FIRE intervals are joined by read ID; legacy
+haplotype tags are not used for grouping. No phased or allele-specific input
+is needed.
+
+```{r package-sample-sheet}
+samples <- make_sample_sheet(data.frame(
+    sample_name = sample_metadata$sample_name,
+    sample_label = sub("_.*$", "", sample_metadata$sample_name),
+    m6a = file.path(sample_metadata$fire_dir, "extracted_results", "m6a_by_chr",
+        "{sample_name}.ft_extracted_m6a.{chr}.bed.gz"),
+    m6a_format = "bed12_fibertools",
+    nucleosome = file.path(sample_metadata$fire_dir, "extracted_results",
+        "nuc_by_chr", "{sample_name}.ft_extracted_nuc.{chr}.bed.gz"),
+    nucleosome_format = "bed12_fibertools",
+    tf = file.path(params$tf_root, "{sample_name}",
+        "{sample_name}.recalled_tf.bed.gz"),
+    tf_format = "bed15_fiberhmm_tf",
+    fire = file.path(sample_metadata$fire_dir, "additional-outputs-v0.1",
+        "fire-peaks", "{sample_name}-v0.1-fire-elements.bed.gz"),
+    fire_format = "bed11_fire"),
+    output = file.path(run_dir, "samples.tsv"))
+
+knitr::kable(as.data.frame(samples[, c("sample_name", "sample_label")]),
+    row.names = FALSE)
+```
+
+This render selects **`r nrow(samples)` samples**. Omit an optional track's
+path and format columns if that track is unavailable for your dataset. A
+supplied but nonexistent file is an input error, so optional tracks should
+not be represented by invented paths.
+
+## 3. Prepare the same promoter window
+
+The supplied TSS BED uses one-base BED intervals and names of the form
+`geneID;transcriptID;geneName;...`. The package's `gencode_custom` reader
+selects the requested gene and expands its TSS. The source file is already
+canonical; ordinary GTF/GFF3 annotations are also supported and do not require
+canonical transcript tags.
+
+```{r promoter}
+region <- prepare_regions(params$tss_bed,
+    bed_annotation = "gencode_custom", genes = gene, flank_bp = flank_bp)
+if (length(region) != 1L) {
+    stop("This single-locus tutorial requires exactly one selected TSS")
+}
+names(region) <- gene
+mcols(region)$region_id <- gene
+region <- prepare_regions(region, output = file.path(run_dir, "regions.tsv"))
+region
+knitr::kable(read.delim(file.path(run_dir, "regions.tsv")), row.names = FALSE)
+```
+
+For ALAS1, the original TSS BED is `[52198159, 52198160)` on chr3. With
+1,000-bp flanks, the selected BED window is `[52197159, 52199159)` and the R
+`GRanges` is **chr3:52197160-52199159**, with TSS **52198160**. BED starts
+are converted once; all in-memory coordinates are one-based inclusive.
+
+To analyze PRDX1 instead, set `gene = "PRDX1"`. It is on the minus strand;
+the upstream side is to the right on a genomic-coordinate plot. Neither
+strand changes the convention that genomic start is less than genomic end.
+
+## 4. Validate and extract the unclustered locus
+
+```{r unclustered-analysis}
+validate_inputs(samples, region)
+unclustered_results <- analyze_loci(samples, region, clustering = FALSE,
+    nuc_min = params$nuc_min, nuc_max = params$nuc_max,
+    min_tf_score = params$min_tf_score, smoothing_bp = params$smoothing_bp)
+x <- unclustered_results[[gene]]
+x
+```
+
+The returned assay is a sparse **positions-by-reads** matrix, the transpose
+of the original tutorial's read-by-position matrix. The package removes
+fibertools sentinel blocks, considers each read's longest overlapping
+alignment, and retains it only when it spans the entire window. Reads with
+no m6A calls in the window remain in the assay and profile denominators.
+
+```{r qc}
+qc <- as.data.frame(metadata(x)$qc)
+zero_call <- Matrix::colSums(assay(x, "m6a")) == 0
+zero_by_sample <- table(factor(colData(x)$sample_name[zero_call],
+    levels = samples$sample_name))
+qc$zero_m6a_reads <- as.integer(zero_by_sample[qc$sample_name])
+knitr::kable(qc, row.names = FALSE)
+knitr::kable(data.frame(samples_in_sheet = nrow(samples),
+    samples_with_full_span_reads = sum(qc$full_span_reads > 0L),
+    genomic_bases = nrow(x), full_span_reads = ncol(x),
+    zero_m6a_reads = sum(zero_call), m6a_calls = sum(assay(x, "m6a"))))
+```
+
+### Keep genomic ranges and read metadata aligned
+
+```{r data-model}
+rowRanges(x)[1:3]
+colData(x)[1:3, c("sample_name", "original_RID", "start", "end")]
+colData(x)$read_range[1:3]
+colData(x)$footprints[1]
+stopifnot(identical(names(rowRanges(x)), rownames(x)),
+    identical(rownames(colData(x)), colnames(x)),
+    identical(colData(x)$RID, colnames(x)),
+    all(start(colData(x)$read_range) == colData(x)$start),
+    all(end(colData(x)$read_range) == colData(x)$end))
+```
+
+Each assay column is named `sample_name::original_RID`. `colData$read_range`
+contains its alignment as a `GRanges`; `colData$footprints` is a `GRangesList`
+with one element per read. Standard experiment subsetting keeps these aligned.
+Metadata retain original QC and parameters as run provenance; `locus_profile()`
+recomputes fractions for the currently selected columns.
+
+## 5. Unclustered m6A heatmap
+
+Reads are shown vertically in sample-sheet order, then alignment start and
+read ID; positions are shown horizontally. Black denotes an observed m6A
+call. A zero is an absence of an observed call, not a measurement that every
+genomic base is an unmethylated adenine. The sample annotation is farthest
+left, followed by the cluster annotation in clustered views. The original
+tutorial's coordinate ticks and orange dashed TSS marker are retained.
+
+```{r unclustered-heatmap, fig.height=10}
+ComplexHeatmap::draw(plot_locus(x, "heatmap"))
+```
+
+## 6. Pooled accessibility profile
+
+Every full-span read, including zero-call reads, contributes to the denominator.
+The grey curve shows the fraction at observed positions; the blue curve
+is the sliding-window mean. The dashed line marks the supplied TSS.
+
+```{r unclustered-profile, fig.height=4}
+profile <- locus_profile(x)
+head(profile)
+stopifnot(all(profile$cov == ncol(x)))
+plot_locus(x, "profile")
+```
+
+`locus_profile()` uses observed-call positions, as in the original tutorial.
+An all-zero locus returns zero fractions at all bases; a locus with no
+full-span reads returns `NA` fractions.
+
+## 7. Matching footprint and FIRE tracks
+
+The same retained reads are used for every panel. Defaults keep nucleosomes
+of 130-160 bp inclusive, TF block scores of at least 50, and TF width classes
+[10,30), [40,60) and [60,80) bp. Footprint coordinates stay one-based in R;
+calls overlapping a locus boundary retain their original interval bounds.
+
+```{r footprint-counts}
+footprints <- unlist(colData(x)$footprints, use.names = FALSE)
+if (length(footprints)) {
+    counts <- as.data.frame(table(track = mcols(footprints)$track,
+        class = mcols(footprints)$class))
+    knitr::kable(counts[counts$Freq > 0L, ], row.names = FALSE)
+}
+metadata(x)$empty_footprint_tracks
+```
+
+A supplied nucleosome or TF track with no retained calls across the samples
+raises `no footprints called in the selected region`. The analysis continues
+and records the empty track type. Omitting optional tracks does not raise
+this warning.
+
+The figure uses the original 2:6:6 layout: accessibility profile, blue m6A
+reads, and overlaid FIRE/nucleosome/TF tracks. FIRE is orange; nucleosomes
+are dark blue; the TF classes are purple, magenta and cyan. Read panels have
+sample-first annotation strips and matching read order. Genomic intervals
+are clipped only for drawing; the stored `GRanges` retain their bounds.
+
+```{r unclustered-footprints, fig.height=14}
+plot_locus(x, "footprints")
+```
+
+## 8. Optional clustering of the same reads
+
+Set the tutorial parameter `clustering = TRUE` to execute this additional
+analysis. It uses the bin size, nearest-neighbor count, resolution and seed
+specified at the start. Exact Manhattan distances use memory quadratic in
+the number of reads; inspect the locus's read count before applying this to
+much larger datasets.
+
+```{r clustered-analysis}
+clustered_results <- NULL
+clustered_available <- FALSE
+if (isTRUE(params$clustering)) {
+    clustered_results <- analyze_loci(samples, region, clustering = TRUE,
+        window_size = params$window_size, k_neighbors = params$k_neighbors,
+        resolution = params$resolution, seed = params$seed,
+        nuc_min = params$nuc_min, nuc_max = params$nuc_max,
+        min_tf_score = params$min_tf_score, smoothing_bp = params$smoothing_bp)
+    clustered <- clustered_results[[gene]]
+    stopifnot(identical(assay(x), assay(clustered)),
+        identical(colnames(x), colnames(clustered)),
+        identical(locus_profile(x), locus_profile(clustered)))
+    print(metadata(clustered)$parameters)
+    print(metadata(clustered)$clustering_status)
+    clustered_available <- "cluster" %in% names(colData(clustered))
+    if (clustered_available) {
+        print(table(colData(clustered)$sample_label, colData(clustered)$cluster))
+        print(head(locus_profile(clustered, by_cluster = TRUE)))
+    }
+} else {
+    cat("Clustering disabled: only the unclustered analysis was run.\n")
+}
+```
+
+Cluster labels are stored in `colData`; the stored assay and its read order
+stay unchanged. Cluster plots order reads by cluster, sample, start and RID,
+and profiles use each cluster's own denominator. Clustering requires at least
+three reads and two occupied features; otherwise the reason for skipping it
+is stored in `metadata`.
+
+Clustered panels use the original Leiden palette throughout. To reuse those
+colors in your own plots:
+
+```{r cluster-palette}
+if (clustered_available) {
+    cluster_colors(colData(clustered)$cluster)
+}
+```
+
+```{r clustered-heatmap, fig.height=10}
+if (clustered_available) {
+    ComplexHeatmap::draw(plot_locus(clustered, "heatmap", clustered = TRUE))
+}
+```
+
+```{r clustered-profile, fig.height=4}
+if (clustered_available) {
+    print(plot_locus(clustered, "profile", clustered = TRUE))
+}
+```
+
+```{r clustered-footprints, fig.height=14}
+if (clustered_available) {
+    print(plot_locus(clustered, "footprints", clustered = TRUE))
+}
+```
+
+## 9. Export and reload the Bioconductor result
+
+```{r export}
+write_locus_results(unclustered_results,
+    file.path(run_dir, "without-clustering"))
+if (!is.null(clustered_results)) {
+    write_locus_results(clustered_results,
+        file.path(run_dir, "with-clustering"))
+}
+list.files(run_dir, recursive = TRUE)
+
+restored <- readRDS(file.path(run_dir, "without-clustering", gene, "locus.rds"))
+stopifnot(identical(assay(restored), assay(x)),
+    identical(rowRanges(restored), rowRanges(x)),
+    identical(colData(restored), colData(x)))
+```
+
+Each locus directory contains the complete `locus.rds`, sparse
+`m6a_matrix.rds`, read metadata, region table and QC. Its `unclustered/`
+directory contains PDF panels, profile/read-order TSVs and a panel manifest.
+After successful clustering, `clustered/` contains the corresponding views,
+`assignments.tsv` and `edges.tsv`. The clustered run also retains unclustered
+views. `samples.tsv` and `regions.tsv` at the run root document the inputs.
+
+For repeat analyses, choose a new output directory. The shared input files
+and their indexes are only read.
+
+## Re-run with another locus or clustering settings
+
+Run these commands in R from the directory containing this Rmd. They are shown
+without execution so knitting does not start another render recursively.
+PRDX1 uses the same 31 sample paths with `{chr}` expanded to chr1.
+
+```r
+rmarkdown::render("LCL-fiber-seq-data-example.Rmd",
+    output_file = "PRDX1-unclustered.html",
+    params = list(gene = "PRDX1", clustering = FALSE,
+        output_dir = "../results/PRDX1-unclustered"))
+
+rmarkdown::render("LCL-fiber-seq-data-example.Rmd",
+    output_file = "ALAS1-binned-clustering.html",
+    params = list(gene = "ALAS1", clustering = TRUE,
+        window_size = 50, k_neighbors = 5, resolution = 0.5,
+        output_dir = "../results/ALAS1-binned-clustering"))
+```
+
+The persistent output directories in these examples must be new or empty.
+These paths are relative to the Rmd directory and continue to work after
+moving the containing project folder. The shared-data input paths are supplied
+through parameters and remain independent of the package checkout location.
+
+## Session information
+
+```{r session}
+sessionInfo()
+```
