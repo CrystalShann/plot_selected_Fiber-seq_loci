@@ -443,12 +443,9 @@ Two executable vignettes cover all ten public functions:
   all three plot types in both modes, adjustable clustering and result export.
 
 The additional [LCL fiber-seq data example](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.html)
-uses all 31 samples from the shared project at ALAS1, with unclustered and
-optional clustered panels. Its [R Markdown source](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.Rmd)
-uses the package functions with configurable paths and clustering settings.
-Reading the HTML requires no access to the shared files; re-running this
-particular example requires those files. The bundled-data vignettes above
-remain portable.
+uses all 31 LCL samples from the at ALAS1 promoter region, with unclustered and
+optional clustered panels. [R Markdown source](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.Rmd)
+
 
 After installing a built release, open them with:
 
@@ -466,7 +463,3 @@ rmarkdown::render("vignettes/function-reference.Rmd")
 rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
 ```
 
-Local HTML previews are written beside their R Markdown sources and ignored
-by Git and source-package builds. `R CMD build` builds the installed vignettes
-from their R Markdown sources. You can share the self-contained HTML files
-directly or attach them to a GitHub Release.
