@@ -30,24 +30,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = TRUE,
     error = FALSE, fig.width = 10, fig.height = 6)
 ```
 
-## What this tutorial reproduces
-
-This is the package-based counterpart of
-`fiber-seq/code/parsing_functions/extract_m6a_tutorial.rmd`. It reads the same
-**31-sample LCL metadata CSV**, full processed tracks in the shared project,
-and ALAS1 TSS from the same GENCODE v46 BED. It uses all available full-span
-reads at the selected locus; it does not use the small bundled example or cap
-the reads per sample.
-
-The first analysis reproduces the original unclustered workflow: a sparse m6A
-assay, heatmap, pooled accessibility profile, and matching nucleosome,
-FiberHMM TF-footprint and FIRE tracks. An optional second analysis shows
-Manhattan/Leiden clusters for exactly the same reads. Both views use public
-functions from `selectFiberseqLociWorkflow`; no analysis scripts are sourced.
-
-This tutorial requires access to the shared files. The published HTML includes
-its executed output and plots and can be read without that access. For a
-portable input dataset, see the package's `example_data()` tutorials.
+This tutorial is based on real LCL data pooled from 31 samples.
 
 ## 1. Load the installed package and choose settings
 
@@ -313,7 +296,10 @@ full-span reads returns `NA` fractions.
 
 The same retained reads are used for every panel. Defaults keep nucleosomes
 of 130-160 bp inclusive, TF block scores of at least 50, and TF width classes
-[10,30), [40,60) and [60,80) bp. Footprint coordinates stay one-based in R;
+[10,30), [40,60) and [60,80) bp by default. To select other lengths,
+pass `tf_length_ranges = list(c(30, 39), c(80, 120))` (inclusive bounds)
+or `tf_length_ranges = NULL` (all lengths) to both `analyze_loci()` calls.
+Footprint coordinates stay one-based in R;
 calls overlapping a locus boundary retain their original interval bounds.
 
 ```{r footprint-counts}

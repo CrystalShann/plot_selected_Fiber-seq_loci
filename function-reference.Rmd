@@ -1,0 +1,414 @@
+---
+title: "Function reference and tutorials"
+author: "Crystal Shan"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{Function reference and tutorials}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+    fig.width = 9, fig.height = 5, error = FALSE)
+```
+
+## Package overview
+
+`selectFiberseqLociWorkflow` visualizes m6A methylation and per-read footprints
+at selected genomic loci using processed tracks from fibertools and FiberHMM.
+You choose the samples, methylation and footprint files, genomic coordinates,
+and footprint length filters. The package produces m6A heatmaps, aggregate
+m6A profiles and footprint panels, with optional clustering of reads by their
+m6A patterns.
+
+The required m6A input is fibertools BED12. Optional tracks include fibertools
+or FiberHMM nucleosomes, FiberHMM or custom per-read TF footprints, and FIRE
+intervals. Human, plant and other genomes are supported when contig names and
+reference assemblies agree across inputs. The package reads processed tracks;
+it does not call methylation or footprints from raw sequencing data.
+
+## Functions by task
+
+Each function below links to a short tutorial on this page. Run the tutorials
+in order for a complete analysis with the bundled LCL data. The reference
+layout follows the concise function summaries in the
+[trackViewer reference](https://jianhong.github.io/trackViewer/reference/index.html).
+
+### Prepare sample inputs
+
+| Function | What it does |
+|:--|:--|
+| [`example_data()`](#example-data) | Load a writable example dataset. |
+| [`make_sample_sheet()`](#make-sample-sheet) | Define samples and track paths. |
+
+### Select genomic regions
+
+| Function | What it does |
+|:--|:--|
+| [`prepare_regions()`](#prepare-regions) | Define loci from coordinates or annotations. |
+| [`extract_canonical_tss()`](#extract-canonical-tss) | Select canonical transcription start sites. |
+
+### Validate and analyze
+
+| Function | What it does |
+|:--|:--|
+| [`validate_inputs()`](#validate-inputs) | Check files, indexes and contigs. |
+| [`analyze_loci()`](#analyze-loci) | Collect locus data and optionally cluster reads. |
+
+### Summarize and visualize
+
+| Function | What it does |
+|:--|:--|
+| [`locus_profile()`](#locus-profile) | Summarize pooled or per-cluster m6A. |
+| [`plot_locus()`](#plot-locus) | Draw heatmaps, profiles and footprints. |
+| [`cluster_colors()`](#cluster-colors) | Get consistent cluster colors. |
+
+### Export results
+
+| Function | What it does |
+|:--|:--|
+| [`write_locus_results()`](#write-locus-results) | Save experiments, tables and figures. |
+
+## Before you start
+
+Install the package and its dependencies as described in the README, then load:
+
+```{r libraries, message=FALSE}
+library(selectFiberseqLociWorkflow)
+library(SummarizedExperiment)
+library(GenomicRanges)
+```
+
+Examples below execute with bundled files and temporary output directories.
+Only the clearly marked own-data example needs paths supplied by you.
+
+## Prepare sample inputs: tutorials
+
+### `example_data()` — load test files {#example-data}
+
+This function copies a small subset of real AL6 and AL8 LCL tracks around
+ALAS1 and PRDX1 into a writable directory. It returns the sample sheet, region
+ranges and copied directory. These files cover the example loci, not the
+whole genome.
+
+```{r example-data}
+e <- example_data()
+names(e)
+e$samples[, c("sample_name", "sample_label")]
+e$regions
+```
+
+The default destination is temporary. To keep the files, pass a new or empty
+folder, for example `example_data("my-fiberseq-example")`.
+
+### `make_sample_sheet()` — specify samples and files {#make-sample-sheet}
+
+Create one row per sample. `sample_name` is a unique ID; `sample_label` is a
+display or group label. The required columns are `sample_name`, `m6a` and
+`m6a_format`. Optional tracks have their own path and format columns.
+
+```{r make-sample-sheet}
+sample_table <- as.data.frame(e$samples)
+sample_file <- tempfile(fileext = ".tsv")
+samples <- make_sample_sheet(sample_table, output = sample_file)
+samples[, c("sample_name", "sample_label", "m6a_format", "tf_format")]
+
+# Reload the saved sample sheet in a later session.
+samples <- make_sample_sheet(sample_file)
+```
+
+To select fewer samples, subset the rows of `sample_table` before calling
+`make_sample_sheet()`. To use your own files, replace the paths in this example:
+
+```{r own-samples, eval=FALSE}
+sample_table <- data.frame(
+    sample_name = c("sample_1", "sample_2"),
+    sample_label = c("Control", "Treatment"),
+    m6a = "/data/{sample_name}/m6a.{chr}.bed.gz",
+    m6a_format = "bed12_fibertools",
+    nucleosome = "/data/{sample_name}/nucleosome.{chr}.bed.gz",
+    nucleosome_format = "bed13_fiberhmm",
+    tf = "/data/{sample_name}/tf.{chr}.bed.gz",
+    tf_format = "bed15_fiberhmm_tf"
+)
+samples <- make_sample_sheet(sample_table, output = "samples.tsv")
+```
+
+For `sample_1` on `Chr5`, the first template resolves to
+`/data/sample_1/m6a.Chr5.bed.gz`. Only `{sample_name}` and `{chr}` are supported
+placeholders. Whole-genome files can use explicit paths without `{chr}`.
+Relative paths in a TSV are resolved against its directory; paths in an
+in-memory table use `base_dir` (default: the working directory).
+
+Each supplied track must be sorted, bgzip-compressed and accompanied by a
+`.tbi` index. Omit optional columns or leave optional paths blank if no track
+is available. The supported format strings are:
+
+| Track | Format |
+|:--|:--|
+| m6A | `bed12_fibertools` |
+| Nucleosome | `bed12_fibertools` or `bed13_fiberhmm` |
+| TF footprint | `bed15_fiberhmm_tf` or `bed6_per_sample` |
+| FIRE | `bed11_fire` |
+
+Custom TF BED6 files use chromosome, zero-based start, end, original read ID,
+score and strand. They must already be score-filtered. Footprint read IDs must
+match the m6A read IDs within the same sample.
+
+## Select genomic regions: tutorials
+
+### `prepare_regions()` — choose loci {#prepare-regions}
+
+Use coordinate strings for a quick custom interval. They are one-based and
+inclusive. This example selects 1,000 bp within the bundled ALAS1 locus:
+
+```{r prepare-regions}
+regions <- prepare_regions("chr3:52197660-52198659")
+names(regions) <- "ALAS1_custom"
+regions
+```
+
+For several loci, supply several strings and give each a unique name. You can
+also supply a coordinate table, a `GRanges`, a BED file, or a GTF/GFF3 annotation.
+Contig names are preserved exactly, including case.
+
+The following BED example describes the same interval. BED starts are
+zero-based and ends are excluded; the region BED needs no tabix index.
+
+```{r bed-regions}
+bed_file <- tempfile(fileext = ".bed")
+write.table(
+    data.frame(chr = "chr3", start = 52197659, end = 52198659,
+               name = "ALAS1_custom"),
+    bed_file, sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE
+)
+regions_from_bed <- prepare_regions(bed_file)
+regions_from_bed
+stopifnot(identical(start(regions), start(regions_from_bed)),
+          identical(end(regions), end(regions_from_bed)))
+```
+
+For tables, declare `coordinate_system = "bed"` or `"one_based"` explicitly.
+For gene-based selection, provide `annotation`, `genes` and `flank_bp`:
+
+```{r annotation-regions}
+# Synthetic plant annotation included to demonstrate GFF3 input.
+plant_annotation <- system.file("extdata", "plant", "annotation.gff3",
+    package = "selectFiberseqLociWorkflow")
+plant_promoters <- prepare_regions(
+    annotation = plant_annotation, genes = "AT5G00010", flank_bp = 1000
+)
+plant_promoters
+```
+
+Annotations must contain transcript/mRNA records with gene relationships.
+Ordinary promoter selection does not require canonical tags. A flank of 1,000
+selects one-based `[TSS - 1000, TSS + 999]`. The plant annotation above is a
+separate illustration; continue using `regions` with the LCL sample sheet.
+
+### `extract_canonical_tss()` — select canonical TSSs {#extract-canonical-tss}
+
+Use this optional function when you specifically want canonical transcripts.
+Specify the attribute and value used by your annotation; the defaults look
+for GENCODE's `tag = Ensembl_canonical`. Missing or ambiguous canonical
+selections raise an error.
+
+```{r extract-canonical-tss}
+canonical_tss <- extract_canonical_tss(
+    annotation = plant_annotation,
+    genes = "AT5G00010",
+    attribute = "canonical", value = "true", flank_bp = 0
+)
+canonical_tss
+```
+
+`flank_bp = 0` returns the single TSS base. A positive flank returns a region
+around it, ready for validation and analysis against matching tracks.
+
+## Validate and analyze: tutorials
+
+### `validate_inputs()` — check the inputs {#validate-inputs}
+
+Check track paths, adjacent indexes, declared column counts and m6A contig
+availability before analyzing. Success returns `TRUE` invisibly; an invalid
+input raises an error describing the problem.
+
+```{r validate-inputs}
+valid <- validate_inputs(samples, regions)
+valid
+```
+
+An optional track may have no calls on the selected contig. A supplied path to
+a missing file is an error. All files and coordinates must use the same genome
+assembly; validation cannot determine the biological assembly from names alone.
+
+### `analyze_loci()` — collect calls and cluster reads {#analyze-loci}
+
+Start without clustering. Here, `tf_length_ranges = NULL` retains all positive
+TF lengths after the applicable score filter:
+
+```{r analyze-unclustered}
+unclustered <- analyze_loci(
+    samples, regions, clustering = FALSE,
+    nuc_min = 130, nuc_max = 160,
+    min_tf_score = 50, tf_length_ranges = NULL,
+    smoothing_bp = 10
+)
+x <- unclustered[["ALAS1_custom"]]
+x
+dim(assay(x, "m6a"))
+```
+
+The result is a named list of locus experiments. Each sparse assay has genomic
+positions in rows and reads in columns. `colData(x)` contains read metadata and
+per-read footprint ranges. Only reads whose longest overlapping alignment
+spans the complete locus are retained, including reads with zero m6A calls.
+
+For custom TF length filters, pass `list(c(30, 39), c(80, 120))` for inclusive
+30–39 and 80–120 bp classes, or `list(c(35, 35))` for exactly 35 bp. Ranges must
+have positive integer bounds and must not overlap. Omitting the argument
+preserves the default 10–29, 40–59 and 60–79 bp classes. Both TF formats use the
+same length filtering; only FiberHMM BED15 uses `min_tf_score`.
+
+Run the same locus with clustering enabled:
+
+```{r analyze-clustered}
+clustered <- analyze_loci(
+    samples, regions, clustering = TRUE,
+    window_size = 50, k_neighbors = 5, resolution = 0.5, seed = 1,
+    nuc_min = 130, nuc_max = 160,
+    min_tf_score = 50, tf_length_ranges = NULL,
+    smoothing_bp = 10
+)
+xc <- clustered[["ALAS1_custom"]]
+S4Vectors::metadata(xc)$clustering_status
+stopifnot(identical(S4Vectors::metadata(xc)$clustering_status, "complete"))
+table(sample = colData(xc)$sample_label, cluster = colData(xc)$cluster)
+```
+
+`window_size` sets clustering bins in bp (`0` uses observed sites without
+binning), `k_neighbors` sets the nearest-neighbor count, `resolution` controls
+Leiden partition granularity, and `seed` controls randomness. Larger resolution
+values generally favor more clusters. These illustrative settings are not
+optimized biological parameters.
+
+Clustering uses m6A patterns across the supplied samples at each locus. It needs
+at least three reads and two occupied features; otherwise, metadata explain
+why it was skipped. Exact Manhattan distances require memory quadratic in the
+number of reads. Footprint filters do not affect the m6A fit. Binning does not
+change the stored single-base assay, and `smoothing_bp` independently controls
+profile smoothing.
+
+## Summarize and visualize: tutorials
+
+### `locus_profile()` — summarize m6A calls {#locus-profile}
+
+Calculate a pooled profile from all retained reads, or separate profiles by
+cluster. `frac` is the observed-call fraction and `smooth_frac` is its smoothed
+value. Zero-call reads remain in the denominator.
+
+```{r locus-profile}
+pooled_profile <- locus_profile(x)
+head(pooled_profile)
+
+cluster_profiles <- locus_profile(xc, by_cluster = TRUE)
+head(cluster_profiles)
+
+# Clustering leaves the pooled profile unchanged.
+stopifnot(identical(pooled_profile, locus_profile(xc)))
+```
+
+Sparse zeros indicate no observed m6A call, not a direct measurement of an
+unmethylated adenine at every genomic base. Subsetting reads in an experiment
+and calling `locus_profile()` recomputes the profile for those reads.
+
+### `plot_locus()` — draw locus figures {#plot-locus}
+
+Choose `"heatmap"`, `"profile"` or `"footprints"`. The heatmap shows reads on the
+y-axis and positions on the x-axis. The footprint composition stacks the m6A
+profile, m6A reads and supplied footprint tracks.
+
+```{r unclustered-heatmap, fig.height=7}
+ComplexHeatmap::draw(plot_locus(x, "heatmap"))
+```
+
+```{r unclustered-profile}
+plot_locus(x, "profile")
+```
+
+```{r unclustered-footprints, fig.height=10}
+plot_locus(x, "footprints")
+```
+
+Use `clustered = TRUE` to order reads by existing assignments and display
+per-cluster profiles. This does not rerun clustering.
+
+```{r clustered-heatmap, fig.height=7}
+ComplexHeatmap::draw(plot_locus(xc, "heatmap", clustered = TRUE))
+```
+
+```{r clustered-profile}
+plot_locus(xc, "profile", clustered = TRUE)
+```
+
+```{r clustered-footprints, fig.height=10}
+plot_locus(xc, "footprints", clustered = TRUE)
+```
+
+Custom TF ranges receive labels and colors automatically. If supplied
+nucleosome or TF tracks contain no retained calls, analysis emits
+`no footprints called in the selected region` and continues. Check read IDs,
+length bounds and score thresholds when calls were expected.
+
+### `cluster_colors()` — reuse cluster colors {#cluster-colors}
+
+Retrieve the plotting palette for cluster labels or factor levels. Use it to
+keep your own figures consistent with the locus plots.
+
+```{r cluster-colors}
+palette <- cluster_colors(colData(xc)$cluster)
+palette
+
+# Named colors can also be requested directly.
+cluster_colors(c("cluster1", "cluster2", "cluster3"))
+```
+
+Numeric cluster IDs retain their colors when a cluster is absent from a subset.
+Keep complete factor levels for palettes containing more than 25 clusters.
+
+## Export results: tutorial
+
+### `write_locus_results()` — save the analysis {#write-locus-results}
+
+Pass a single locus experiment or the complete results list, and choose a new
+or empty output directory. This example exports all loci from the clustered
+run, including both unclustered and clustered views:
+
+```{r write-locus-results}
+output_dir <- tempfile("fiberseq-reference-results-")
+write_locus_results(clustered, output_dir)
+list.files(output_dir, recursive = TRUE)
+```
+
+Each locus directory includes `locus.rds`, `m6a_matrix.rds`, read/QC/region TSVs,
+and PDF figures. Successful clustering adds assignments and graph edges.
+Replace `tempfile()` with a persistent folder to keep the results.
+
+```{r reload-results}
+restored <- readRDS(file.path(output_dir, "ALAS1_custom", "locus.rds"))
+stopifnot(identical(assay(restored), assay(xc)),
+          identical(colData(restored), colData(xc)))
+```
+
+Reload `locus.rds` to retain the full experiment, including footprints and run
+parameters. The matrix-only RDS does not contain that additional information.
+
+## Session information
+
+```{r session}
+sessionInfo()
+```

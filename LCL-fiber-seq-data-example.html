@@ -1504,27 +1504,7 @@ div.tocify {
 </div>
 
 
-<div id="what-this-tutorial-reproduces" class="section level2">
-<h2>What this tutorial reproduces</h2>
-<p>This is the package-based counterpart of
-<code>fiber-seq/code/parsing_functions/extract_m6a_tutorial.rmd</code>.
-It reads the same <strong>31-sample LCL metadata CSV</strong>, full
-processed tracks in the shared project, and ALAS1 TSS from the same
-GENCODE v46 BED. It uses all available full-span reads at the selected
-locus; it does not use the small bundled example or cap the reads per
-sample.</p>
-<p>The first analysis reproduces the original unclustered workflow: a
-sparse m6A assay, heatmap, pooled accessibility profile, and matching
-nucleosome, FiberHMM TF-footprint and FIRE tracks. An optional second
-analysis shows Manhattan/Leiden clusters for exactly the same reads.
-Both views use public functions from
-<code>selectFiberseqLociWorkflow</code>; no analysis scripts are
-sourced.</p>
-<p>This tutorial requires access to the shared files. The published HTML
-includes its executed output and plots and can be read without that
-access. For a portable input dataset, see the package’s
-<code>example_data()</code> tutorials.</p>
-</div>
+<p>This tutorial is based on real LCL data pooled from 31 samples.</p>
 <div id="load-the-installed-package-and-choose-settings" class="section level2">
 <h2>1. Load the installed package and choose settings</h2>
 <p>Install the package and dependencies using its README before
@@ -2400,7 +2380,7 @@ fractions.</p>
 <h2>7. Matching footprint and FIRE tracks</h2>
 <p>The same retained reads are used for every panel. Defaults keep
 nucleosomes of 130-160 bp inclusive, TF block scores of at least 50, and
-TF width classes [10,30), [40,60) and [60,80) bp. Footprint coordinates
+TF width classes [10,30), [40,60) and [60,80) bp by default. To select other lengths, pass <code>tf_length_ranges = list(c(30, 39), c(80, 120))</code> (inclusive bounds) or <code>tf_length_ranges = NULL</code> (all lengths) to both <code>analyze_loci()</code> calls. Footprint coordinates
 stay one-based in R; calls overlapping a locus boundary retain their
 original interval bounds.</p>
 <pre class="r"><code>footprints &lt;- unlist(colData(x)$footprints, use.names = FALSE)

@@ -13,7 +13,7 @@
 <meta name="author" content="Crystal Shan" />
 
 
-<title>LCL input structures and function guide</title>
+<title>Overview of the functions</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -338,8 +338,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">LCL input structures and function
-guide</h1>
+<h1 class="title toc-ignore">Overview of the functions</h1>
 <h4 class="author">Crystal Shan</h4>
 
 
@@ -393,78 +392,65 @@ than BAM or FASTQ files. See <strong>Select Fiber-seq loci: ALAS1 with
 and without clustering</strong> for the full set of clustered and
 unclustered panels.</p>
 <table>
-<colgroup>
-<col width="33%" />
-<col width="33%" />
-<col width="33%" />
-</colgroup>
 <thead>
 <tr class="header">
 <th align="left">Function</th>
 <th align="left">Accepted input</th>
-<th align="left">Output / next step</th>
+
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="left"><code>example_data()</code></td>
 <td align="left">New or empty writable directory</td>
-<td align="left">A list containing <code>samples</code>,
-<code>regions</code> and <code>directory</code></td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>make_sample_sheet()</code></td>
 <td align="left"><code>data.frame</code>, <code>DataFrame</code>, or a
 headered TSV path</td>
-<td align="left">Sample <code>DataFrame</code> for validation and
-analysis</td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>prepare_regions()</code></td>
 <td align="left"><code>GRanges</code>, coordinate table/string,
 headerless BED, or GTF/GFF3</td>
-<td align="left">Named <code>GRanges</code> for validation and
-analysis</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>extract_canonical_tss()</code></td>
 <td align="left">GTF/GFF3 with a specified canonical attribute</td>
-<td align="left">Optional alternative source of region
-<code>GRanges</code></td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>validate_inputs()</code></td>
 <td align="left">Sample sheet plus region <code>GRanges</code></td>
-<td align="left">Invisible <code>TRUE</code>, or an informative
-error</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>analyze_loci()</code></td>
 <td align="left">Samples, regions and explicit clustering choice</td>
-<td align="left">Named <code>SimpleList</code> of
-<code>RangedSummarizedExperiment</code> objects</td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>locus_profile()</code></td>
 <td align="left">One locus experiment</td>
-<td align="left"><code>DataFrame</code> of pooled or cluster-wise
-fractions</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>plot_locus()</code></td>
 <td align="left">One locus experiment, panel type and view</td>
-<td align="left"><code>ComplexHeatmap::Heatmap</code>, ggplot or
-patchwork composition</td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>cluster_colors()</code></td>
 <td align="left">Cluster labels or factor levels</td>
-<td align="left">Original cluster colors, shared by all plots</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>write_locus_results()</code></td>
 <td align="left">One experiment or the whole results list</td>
-<td align="left">RDS, TSV and PDF files in a new or empty directory</td>
+
 </tr>
 </tbody>
 </table>
@@ -545,54 +531,44 @@ files.</p>
 </tbody>
 </table>
 <table>
-<colgroup>
-<col width="33%" />
-<col width="33%" />
-<col width="33%" />
-</colgroup>
 <thead>
 <tr class="header">
 <th align="left">Column(s)</th>
 <th align="left">Required?</th>
-<th align="left">Meaning</th>
+
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="left"><code>sample_name</code></td>
 <td align="left">Yes</td>
-<td align="left">Unique read namespace and sample key; use letters,
-digits, <code>_</code>, <code>.</code> or <code>-</code></td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>sample_label</code></td>
 <td align="left">No</td>
-<td align="left">Display label; defaults to
-<code>sample_name</code></td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>m6a</code>, <code>m6a_format</code></td>
 <td align="left">Yes</td>
-<td align="left">Path/template and explicit modification-track
-format</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>nucleosome</code>,
 <code>nucleosome_format</code></td>
 <td align="left">No</td>
-<td align="left">Path/template and format for a supplied nucleosome
-track</td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>tf</code>, <code>tf_format</code></td>
 <td align="left">No</td>
-<td align="left">Path/template and format for supplied TF
-footprints</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>fire</code>, <code>fire_format</code></td>
 <td align="left">No</td>
-<td align="left">Path/template and format for a supplied FIRE track</td>
+
 </tr>
 </tbody>
 </table>
@@ -705,58 +681,45 @@ inclusive. PRDX1 is on the minus strand, but its genomic start is still
 less than its end. Coordinates are not reversed for minus-strand
 loci.</p>
 <table>
-<colgroup>
-<col width="33%" />
-<col width="33%" />
-<col width="33%" />
-</colgroup>
 <thead>
 <tr class="header">
 <th align="left">Input to <code>prepare_regions()</code></th>
 <th align="left">Coordinate convention</th>
-<th align="left">Details</th>
+
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="left"><code>GRanges</code></td>
 <td align="left">One-based inclusive</td>
-<td align="left">Preserves sequence information; names identify
-regions</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>data.frame</code> / <code>DataFrame</code></td>
 <td align="left">Explicit <code>&quot;bed&quot;</code> or
 <code>&quot;one_based&quot;</code></td>
-<td align="left">Required <code>chr</code>, <code>start</code>,
-<code>end</code>; optional <code>region_id</code>, <code>strand</code>,
-<code>tss</code></td>
+
 </tr>
 <tr class="odd">
 <td align="left">Headerless BED path</td>
 <td align="left">Zero-based, half-open</td>
-<td align="left">First three fields are contig/start/end; field 4 is
-region ID and field 6 is strand</td>
+
 </tr>
 <tr class="even">
 <td align="left"><code>&quot;chr3:52197160-52199159&quot;</code></td>
 <td align="left">One-based inclusive</td>
-<td align="left">Plain coordinate string; no TSS or gene metadata
-inferred</td>
+
 </tr>
 <tr class="odd">
 <td align="left"><code>annotation = &quot;file.gtf&quot;</code> or
 <code>&quot;file.gff3&quot;</code></td>
 <td align="left">One-based annotation coordinates</td>
-<td align="left">Transcript features define TSSs; see annotation
-examples below</td>
+
 </tr>
 <tr class="even">
 <td align="left">Custom single-base TSS BED</td>
 <td align="left">Zero-based, half-open</td>
-<td align="left">Optional
-<code>bed_annotation = &quot;gencode_custom&quot;</code>; name field is
-<code>geneID;annotation;geneName</code></td>
+
 </tr>
 </tbody>
 </table>
@@ -1223,10 +1186,11 @@ selected region still contribute to the denominator if they span the
 region.</p>
 <p>For the actual TF BED15, field 13 contains scores for individual
 blocks. <code>min_tf_score = 50</code> filters those scores, not field
-5. Retained TF width classes are [10,30), [40,60) and [60,80) bp. BED6
+5. Default TF width classes are [10,30), [40,60) and [60,80) bp. BED6
 TF intervals are expected to be score-filtered already; the same width
 classes apply. The default retained nucleosome widths are 130 through
 160 bp inclusive.</p>
+<p>TF length classes can be changed with <code>tf_length_ranges = list(c(30, 39), c(80, 120))</code>, using inclusive bounds, or <code>tf_length_ranges = NULL</code> to retain all positive lengths. This applies to both FiberHMM BED15 and custom BED6 TF inputs.</p>
 <p>FIRE records are per-read intervals, joined by their original RID.
 The trailing tag may contain legacy haplotype labels in these source
 files; the package does not use that field to phase or split reads.
