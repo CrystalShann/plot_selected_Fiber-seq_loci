@@ -1,0 +1,3 @@
+region_id	chr	start	end	strand	tss	analysis_start	analysis_end	width
+ALAS1	chr3	52197159	52199159	+	52198160	52197160	52199159	2000
+PRDX1	chr1	45520883	45522883	-	45521884	45520884	45522883	2000

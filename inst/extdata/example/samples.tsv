@@ -1,0 +1,3 @@
+sample_name	sample_label	m6a	m6a_format	nucleosome	nucleosome_format	tf	tf_format	fire	fire_format
+AL6_bc2162_19093	AL6	tracks/AL6_bc2162_19093/m6a.{chr}.bed.gz	bed12_fibertools	tracks/AL6_bc2162_19093/nucleosome.{chr}.bed.gz	bed12_fibertools	tracks/AL6_bc2162_19093/tf.{chr}.bed.gz	bed15_fiberhmm_tf	tracks/AL6_bc2162_19093/fire.{chr}.bed.gz	bed11_fire
+AL8_bc2170_19151	AL8	tracks/AL8_bc2170_19151/m6a.{chr}.bed.gz	bed12_fibertools	tracks/AL8_bc2170_19151/nucleosome.{chr}.bed.gz	bed12_fibertools	tracks/AL8_bc2170_19151/tf.{chr}.bed.gz	bed15_fiberhmm_tf	tracks/AL8_bc2170_19151/fire.{chr}.bed.gz	bed11_fire

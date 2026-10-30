@@ -1,0 +1,7 @@
+##gff-version 3
+Chr5	fixture	gene	2001	8000	.	+	.	ID=AT5G00010;Name=PlantGene
+Chr5	fixture	mRNA	2001	8000	.	+	.	ID=AT5G00010.1;Parent=AT5G00010;canonical=true
+Chr5	fixture	mRNA	2201	8000	.	+	.	ID=AT5G00010.2;Parent=AT5G00010
+Chr5	fixture	mRNA	2001	7500	.	+	.	ID=AT5G00010.3;Parent=AT5G00010
+scaffold_42	fixture	gene	1001	5000	.	-	.	ID=PlantGene2
+scaffold_42	fixture	mRNA	1001	5000	.	-	.	ID=PlantGene2.1;Parent=PlantGene2

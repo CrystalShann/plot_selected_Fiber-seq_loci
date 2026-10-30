@@ -1,0 +1,2 @@
+sample_name	m6a	m6a_format	nucleosome	nucleosome_format	tf	tf_format
+plant	m6a.bed.gz	bed12_fibertools	nuc.bed.gz	bed13_fiberhmm	tf.bed.gz	bed15_fiberhmm_tf

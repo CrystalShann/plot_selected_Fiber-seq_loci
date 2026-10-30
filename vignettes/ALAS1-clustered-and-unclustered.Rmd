@@ -1,0 +1,201 @@
+---
+title: "Select Fiber-seq loci: ALAS1 with and without clustering"
+author: "Crystal Shan"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Select Fiber-seq loci: ALAS1 with and without clustering}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+    fig.width = 9, fig.height = 5)
+```
+
+## Introduction
+
+`selectFiberseqLociWorkflow` is a native R package for analyzing processed
+Fiber-seq tracks at selected loci. Analysis runs directly in R. Regions use
+`GRanges`; each locus is a `RangedSummarizedExperiment` with genomic positions
+in rows and individual reads in columns. This vignette uses the same ALAS1
+region and two tutorial LCL samples for both clustering choices.
+
+The bundled data contain up to 100 full-span reads per sample per region,
+with complete matching m6A, nucleosome, TF-footprint and FIRE records. The
+small subset has 18 full-span reads at ALAS1 and 16 at PRDX1. It demonstrates
+usage and numerical consistency; it is not a biological replicate study.
+The data provenance and reproducible subset-generation script accompany the
+package. No allele-specific inputs or topic modelling are used.
+
+## Load the package and writable example
+
+```{r libraries}
+library(selectFiberseqLociWorkflow)
+library(SummarizedExperiment)
+library(GenomicRanges)
+```
+
+```{r input}
+example <- example_data()
+example$samples[, c("sample_name", "sample_label", "m6a_format", "tf_format")]
+alas1 <- example$regions["ALAS1"]
+alas1
+validate_inputs(example$samples, alas1)
+```
+
+The input region covers chr3:52197160-52199159, with a TSS at 52198160
+(one-based inclusive). File formats are explicit. The package does not infer
+whether tracks came from fibertools or FiberHMM.
+
+## Analyze without clustering
+
+Choose `clustering` explicitly. Reads are retained only if their longest
+alignment spans the whole selected window, including reads with no m6A calls.
+The assay is sparse and binary: zero means no observed m6A call at that base,
+not a direct measurement that every base is an unmethylated adenine.
+
+```{r unclustered}
+unclustered <- analyze_loci(example$samples, alas1, clustering = FALSE)[[1]]
+unclustered
+colData(unclustered)[, c("sample_name", "original_RID", "start", "end")]
+```
+
+### Interoperability and coordinate consistency
+
+All in-memory coordinates are one-based inclusive. BED starts are converted
+once at import. `rowRanges` identifies each assay row; `colData` identifies
+its corresponding read column. Read alignments are `GRanges`, and footprints
+are grouped by read in a `GRangesList` column of `colData`.
+
+```{r containers}
+rowRanges(unclustered)[1:3]
+colData(unclustered)$read_range[1:3]
+colData(unclustered)$footprints[1]
+small <- unclustered[1:20, c(3, 1)]
+stopifnot(identical(colnames(small), rownames(colData(small))),
+    identical(colnames(small), colData(small)$RID),
+    identical(names(rowRanges(small)), rownames(small)))
+small
+```
+
+Subsetting keeps read metadata, alignment ranges and footprints aligned with
+assay columns. Footprints describe the retained read within the original
+locus; row subsetting does not clip these stored intervals. Original QC,
+parameters and the cluster graph remain in `metadata` as run provenance.
+`locus_profile()` recalculates fractions for the current columns.
+
+### Unclustered views
+
+Rows in the heatmap follow sample-sheet order, alignment start and read ID.
+The heatmap displays reads vertically and positions horizontally even though
+the underlying experiment uses the standard features-by-observations layout.
+
+```{r unclustered-heatmap, fig.height=6}
+ComplexHeatmap::draw(plot_locus(unclustered, "heatmap"))
+```
+
+The pooled fraction divides by all full-span reads, including zero-call reads.
+Grey shows observed-position fractions; the colored curve uses the tutorial
+10-bp sliding-window mean. The dashed line marks the supplied TSS.
+
+```{r unclustered-profile}
+plot_locus(unclustered, "profile")
+head(locus_profile(unclustered))
+```
+
+Optional tracks use nucleosomes of 130-160 bp and TF footprints in [10,30),
+[40,60), or [60,80) bp. FiberHMM TF blocks require a score of at least 50.
+A supplied footprint track with no retained calls raises the warning
+`no footprints called in the selected region`; the analysis still completes.
+
+```{r unclustered-footprints, fig.height=8}
+plot_locus(unclustered, "footprints")
+```
+
+## Analyze the same locus with clustering
+
+Clustering uses observed m6A positions, Manhattan distances, a nearest-neighbor
+graph and Leiden communities. It does not change the input read set, sparse
+assay, pooled denominators or unclustered plots. The seed and all parameters
+are saved with the experiment. Exact pairwise distances require memory
+quadratic in the number of reads, so select suitably sized loci and datasets.
+
+```{r clustered}
+clustered <- analyze_loci(example$samples, alas1, clustering = TRUE,
+    k_neighbors = 10, resolution = 1, seed = 1)[[1]]
+stopifnot(identical(assay(unclustered), assay(clustered)),
+    identical(colnames(unclustered), colnames(clustered)),
+    identical(locus_profile(unclustered), locus_profile(clustered)))
+table(colData(clustered)$sample_label, colData(clustered)$cluster)
+metadata(clustered)$clustering_status
+```
+
+```{r clustered-heatmap, fig.height=6}
+ComplexHeatmap::draw(plot_locus(clustered, "heatmap", clustered = TRUE))
+```
+
+```{r clustered-profile}
+plot_locus(clustered, "profile", clustered = TRUE)
+```
+
+```{r clustered-footprints, fig.height=8}
+plot_locus(clustered, "footprints", clustered = TRUE)
+```
+
+Cluster plots only reorder reads or split profile denominators by existing
+cluster assignments. If a locus has fewer than three reads or two occupied
+features, clustering is skipped with a reason in `metadata`.
+
+## Export and reload
+
+One call writes both views for this clustered result, alongside the complete
+Bioconductor object. The `unclustered` directory remains independent of
+clustering parameters. RDS files preserve the explicit clustering choice for
+later plotting; re-analysis requires a new explicit choice.
+
+```{r export}
+output <- tempfile("alas1-output-")
+write_locus_results(clustered, output)
+list.files(output, recursive = TRUE)
+restored <- readRDS(file.path(output, "ALAS1", "locus.rds"))
+stopifnot(identical(assay(restored), assay(clustered)))
+```
+
+## User data and plant annotations
+
+Create a sample sheet with `make_sample_sheet(data.frame(...))`. Required
+columns are `sample_name`, `m6a` and `m6a_format`; optional tracks have their own
+explicit format columns. Paths can use `{sample_name}` and `{chr}` templates.
+Use bgzip-compressed tracks with adjacent tabix indexes and exact matching
+contig names from the same genome assembly. The package expects processed
+tracks; it does not call fibertools or FiberHMM itself.
+
+`prepare_regions()` accepts `GRanges`, BED files, one-based inclusive coordinate
+strings, coordinate tables with declared conventions, or GTF/GFF3 transcript
+annotations. Ordinary annotation extraction retains distinct TSSs and does
+not require canonical transcripts. Promoter flanks default to 1,000 bp.
+
+```{r plant-annotations}
+annotation <- system.file("extdata", "plant", "annotation.gff3",
+    package = "selectFiberseqLociWorkflow")
+plant_regions <- prepare_regions(annotation = annotation)
+plant_regions
+prepare_regions("scaffold_42:4001-6000")
+extract_canonical_tss(annotation, genes = "AT5G00010",
+    attribute = "canonical", value = "true")
+```
+
+The synthetic fixture includes `Chr5`, `scaffold_42`, both strands, shared and
+distinct transcript TSSs, and genes without canonical tags. It verifies format
+and coordinate compatibility with plants; it does not validate a particular
+plant caller or assembly. `extract_canonical_tss()` is an optional stricter
+helper and reports genes with missing or ambiguous selections.
+
+## Session information
+
+```{r session}
+sessionInfo()
+```

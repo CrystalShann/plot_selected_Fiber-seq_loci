@@ -1,0 +1,3 @@
+Chr5	fixture	transcript	2001	8000	.	+	.	gene_id "AT5G00010"; transcript_id "AT5G00010.1"; gene_name "PlantGene"; tag "basic"; tag "Ensembl_canonical";
+Chr5	fixture	transcript	2201	8000	.	+	.	gene_id "AT5G00010"; transcript_id "AT5G00010.2"; gene_name "PlantGene";
+scaffold_42	fixture	transcript	1001	5000	.	-	.	gene_id "PlantGene2"; transcript_id "PlantGene2.1"; tag "Ensembl_canonical";

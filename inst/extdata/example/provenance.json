@@ -1,0 +1,286 @@
+{
+  "selection": "First two sample-sheet rows; lexicographically first <=100 full-span read IDs per sample and locus; complete overlapping source records retained",
+  "records": [
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "ALAS1",
+      "track": "m6a",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/extracted_results/m6a_by_chr/AL6_bc2162_19093.ft_extracted_m6a.chr3.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/100664448/ccs",
+        "m84241_241120_172940_s3/164890909/ccs",
+        "m84241_241120_172940_s3/3084813/ccs",
+        "m84241_250514_222554_s2/132252921/ccs",
+        "m84241_250514_222554_s2/166397328/ccs",
+        "m84241_250514_222554_s2/265817825/ccs",
+        "m84241_250906_015218_s2/212403396/ccs",
+        "m84241_250906_015218_s2/58917335/ccs"
+      ],
+      "record_count": 8
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "ALAS1",
+      "track": "nucleosome",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/extracted_results/nuc_by_chr/AL6_bc2162_19093.ft_extracted_nuc.chr3.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/100664448/ccs",
+        "m84241_241120_172940_s3/164890909/ccs",
+        "m84241_241120_172940_s3/3084813/ccs",
+        "m84241_250514_222554_s2/132252921/ccs",
+        "m84241_250514_222554_s2/166397328/ccs",
+        "m84241_250514_222554_s2/265817825/ccs",
+        "m84241_250906_015218_s2/212403396/ccs",
+        "m84241_250906_015218_s2/58917335/ccs"
+      ],
+      "record_count": 8
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "ALAS1",
+      "track": "tf",
+      "source": "LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model/AL6_bc2162_19093/AL6_bc2162_19093.recalled_tf.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/100664448/ccs",
+        "m84241_241120_172940_s3/164890909/ccs",
+        "m84241_241120_172940_s3/3084813/ccs",
+        "m84241_250514_222554_s2/132252921/ccs",
+        "m84241_250514_222554_s2/166397328/ccs",
+        "m84241_250514_222554_s2/265817825/ccs",
+        "m84241_250906_015218_s2/212403396/ccs",
+        "m84241_250906_015218_s2/58917335/ccs"
+      ],
+      "record_count": 8
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "ALAS1",
+      "track": "fire",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/additional-outputs-v0.1/fire-peaks/AL6_bc2162_19093-v0.1-fire-elements.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/100664448/ccs",
+        "m84241_241120_172940_s3/164890909/ccs",
+        "m84241_241120_172940_s3/3084813/ccs",
+        "m84241_250514_222554_s2/132252921/ccs",
+        "m84241_250514_222554_s2/166397328/ccs",
+        "m84241_250514_222554_s2/265817825/ccs",
+        "m84241_250906_015218_s2/212403396/ccs",
+        "m84241_250906_015218_s2/58917335/ccs"
+      ],
+      "record_count": 11
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "PRDX1",
+      "track": "m6a",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/extracted_results/m6a_by_chr/AL6_bc2162_19093.ft_extracted_m6a.chr1.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/61344256/ccs",
+        "m84241_250514_222554_s2/115346286/ccs",
+        "m84241_250906_015218_s2/83890064/ccs",
+        "m84241_250906_233611_s3/112725535/ccs",
+        "m84241_250910_205027_s2/53941414/ccs"
+      ],
+      "record_count": 5
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "PRDX1",
+      "track": "nucleosome",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/extracted_results/nuc_by_chr/AL6_bc2162_19093.ft_extracted_nuc.chr1.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/61344256/ccs",
+        "m84241_250514_222554_s2/115346286/ccs",
+        "m84241_250906_015218_s2/83890064/ccs",
+        "m84241_250906_233611_s3/112725535/ccs",
+        "m84241_250910_205027_s2/53941414/ccs"
+      ],
+      "record_count": 5
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "PRDX1",
+      "track": "tf",
+      "source": "LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model/AL6_bc2162_19093/AL6_bc2162_19093.recalled_tf.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/61344256/ccs",
+        "m84241_250514_222554_s2/115346286/ccs",
+        "m84241_250906_015218_s2/83890064/ccs",
+        "m84241_250906_233611_s3/112725535/ccs",
+        "m84241_250910_205027_s2/53941414/ccs"
+      ],
+      "record_count": 4
+    },
+    {
+      "sample": "AL6_bc2162_19093",
+      "region": "PRDX1",
+      "track": "fire",
+      "source": "LCL_Fiber_seq/FIRE/results/AL6_bc2162_19093/additional-outputs-v0.1/fire-peaks/AL6_bc2162_19093-v0.1-fire-elements.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/61344256/ccs",
+        "m84241_250514_222554_s2/115346286/ccs",
+        "m84241_250906_015218_s2/83890064/ccs",
+        "m84241_250906_233611_s3/112725535/ccs",
+        "m84241_250910_205027_s2/53941414/ccs"
+      ],
+      "record_count": 7
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "ALAS1",
+      "track": "m6a",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/extracted_results/m6a_by_chr/AL8_bc2170_19151.ft_extracted_m6a.chr3.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/42731319/ccs",
+        "m84241_250325_230544_s1/135796634/ccs",
+        "m84241_250325_230544_s1/158597829/ccs",
+        "m84241_250325_230544_s1/189993650/ccs",
+        "m84241_250325_230544_s1/197329764/ccs",
+        "m84241_250325_230544_s1/230823887/ccs",
+        "m84241_250325_230544_s1/237962346/ccs",
+        "m84241_250325_230544_s1/40307897/ccs",
+        "m84241_250325_230544_s1/61407770/ccs",
+        "m84241_250325_230544_s1/87559118/ccs"
+      ],
+      "record_count": 10
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "ALAS1",
+      "track": "nucleosome",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/extracted_results/nuc_by_chr/AL8_bc2170_19151.ft_extracted_nuc.chr3.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/42731319/ccs",
+        "m84241_250325_230544_s1/135796634/ccs",
+        "m84241_250325_230544_s1/158597829/ccs",
+        "m84241_250325_230544_s1/189993650/ccs",
+        "m84241_250325_230544_s1/197329764/ccs",
+        "m84241_250325_230544_s1/230823887/ccs",
+        "m84241_250325_230544_s1/237962346/ccs",
+        "m84241_250325_230544_s1/40307897/ccs",
+        "m84241_250325_230544_s1/61407770/ccs",
+        "m84241_250325_230544_s1/87559118/ccs"
+      ],
+      "record_count": 10
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "ALAS1",
+      "track": "tf",
+      "source": "LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model/AL8_bc2170_19151/AL8_bc2170_19151.recalled_tf.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/42731319/ccs",
+        "m84241_250325_230544_s1/135796634/ccs",
+        "m84241_250325_230544_s1/158597829/ccs",
+        "m84241_250325_230544_s1/189993650/ccs",
+        "m84241_250325_230544_s1/197329764/ccs",
+        "m84241_250325_230544_s1/230823887/ccs",
+        "m84241_250325_230544_s1/237962346/ccs",
+        "m84241_250325_230544_s1/40307897/ccs",
+        "m84241_250325_230544_s1/61407770/ccs",
+        "m84241_250325_230544_s1/87559118/ccs"
+      ],
+      "record_count": 10
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "ALAS1",
+      "track": "fire",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/additional-outputs-v0.1/fire-peaks/AL8_bc2170_19151-v0.1-fire-elements.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/42731319/ccs",
+        "m84241_250325_230544_s1/135796634/ccs",
+        "m84241_250325_230544_s1/158597829/ccs",
+        "m84241_250325_230544_s1/189993650/ccs",
+        "m84241_250325_230544_s1/197329764/ccs",
+        "m84241_250325_230544_s1/230823887/ccs",
+        "m84241_250325_230544_s1/237962346/ccs",
+        "m84241_250325_230544_s1/40307897/ccs",
+        "m84241_250325_230544_s1/61407770/ccs",
+        "m84241_250325_230544_s1/87559118/ccs"
+      ],
+      "record_count": 12
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "PRDX1",
+      "track": "m6a",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/extracted_results/m6a_by_chr/AL8_bc2170_19151.ft_extracted_m6a.chr1.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/212143456/ccs",
+        "m84241_241120_172940_s3/41619971/ccs",
+        "m84241_250325_230544_s1/11602268/ccs",
+        "m84241_250325_230544_s1/149094862/ccs",
+        "m84241_250325_230544_s1/162792839/ccs",
+        "m84241_250325_230544_s1/184486613/ccs",
+        "m84241_250325_230544_s1/197006708/ccs",
+        "m84241_250325_230544_s1/234686081/ccs",
+        "m84241_250325_230544_s1/40764141/ccs",
+        "m84241_250325_230544_s1/57215634/ccs",
+        "m84241_250325_230544_s1/7476303/ccs"
+      ],
+      "record_count": 11
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "PRDX1",
+      "track": "nucleosome",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/extracted_results/nuc_by_chr/AL8_bc2170_19151.ft_extracted_nuc.chr1.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/212143456/ccs",
+        "m84241_241120_172940_s3/41619971/ccs",
+        "m84241_250325_230544_s1/11602268/ccs",
+        "m84241_250325_230544_s1/149094862/ccs",
+        "m84241_250325_230544_s1/162792839/ccs",
+        "m84241_250325_230544_s1/184486613/ccs",
+        "m84241_250325_230544_s1/197006708/ccs",
+        "m84241_250325_230544_s1/234686081/ccs",
+        "m84241_250325_230544_s1/40764141/ccs",
+        "m84241_250325_230544_s1/57215634/ccs",
+        "m84241_250325_230544_s1/7476303/ccs"
+      ],
+      "record_count": 11
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "PRDX1",
+      "track": "tf",
+      "source": "LCL_Fiber_seq/FiberHMM/FiberHMM_v2/results/results_v1_trained_model/AL8_bc2170_19151/AL8_bc2170_19151.recalled_tf.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/212143456/ccs",
+        "m84241_241120_172940_s3/41619971/ccs",
+        "m84241_250325_230544_s1/11602268/ccs",
+        "m84241_250325_230544_s1/149094862/ccs",
+        "m84241_250325_230544_s1/162792839/ccs",
+        "m84241_250325_230544_s1/184486613/ccs",
+        "m84241_250325_230544_s1/197006708/ccs",
+        "m84241_250325_230544_s1/234686081/ccs",
+        "m84241_250325_230544_s1/40764141/ccs",
+        "m84241_250325_230544_s1/57215634/ccs",
+        "m84241_250325_230544_s1/7476303/ccs"
+      ],
+      "record_count": 11
+    },
+    {
+      "sample": "AL8_bc2170_19151",
+      "region": "PRDX1",
+      "track": "fire",
+      "source": "LCL_Fiber_seq/FIRE/results/AL8_bc2170_19151/additional-outputs-v0.1/fire-peaks/AL8_bc2170_19151-v0.1-fire-elements.bed.gz",
+      "selected_read_ids": [
+        "m84241_241120_172940_s3/212143456/ccs",
+        "m84241_241120_172940_s3/41619971/ccs",
+        "m84241_250325_230544_s1/11602268/ccs",
+        "m84241_250325_230544_s1/149094862/ccs",
+        "m84241_250325_230544_s1/162792839/ccs",
+        "m84241_250325_230544_s1/184486613/ccs",
+        "m84241_250325_230544_s1/197006708/ccs",
+        "m84241_250325_230544_s1/234686081/ccs",
+        "m84241_250325_230544_s1/40764141/ccs",
+        "m84241_250325_230544_s1/57215634/ccs",
+        "m84241_250325_230544_s1/7476303/ccs"
+      ],
+      "record_count": 20
+    }
+  ],
+  "source_paths": "Relative to the originating LCL_Fiber_seq dataset; these are provenance, not runtime inputs."
+}

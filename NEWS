@@ -1,0 +1,9 @@
+Changes in version 0.99.0
+
+* Convert analysis into a native R package without a workflow engine.
+* Return GRanges regions and RangedSummarizedExperiment locus results.
+* Keep alignment ranges and footprint GRangesLists in colData so read subsets
+  remain synchronized with the sparse modification assay.
+* Support explicit optional Leiden clustering and plant transcript annotations.
+* Warn when a supplied footprint track has no calls in a selected region.
+* Add an executable ALAS1 vignette comparing both clustering choices.
