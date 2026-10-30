@@ -1,3 +1,4 @@
 .Rhistory
 .RData
 *.Rcheck/
+vignettes/*.html

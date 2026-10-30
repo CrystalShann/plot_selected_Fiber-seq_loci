@@ -12,7 +12,7 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
-    fig.width = 9, fig.height = 5)
+    fig.width = 9, fig.height = 5, error = FALSE)
 ```
 
 ## Introduction
@@ -28,7 +28,23 @@ with complete matching m6A, nucleosome, TF-footprint and FIRE records. The
 small subset has 18 full-span reads at ALAS1 and 16 at PRDX1. It demonstrates
 usage and numerical consistency; it is not a biological replicate study.
 The data provenance and reproducible subset-generation script accompany the
-package. No allele-specific inputs or topic modelling are used.
+package. The example files are a subset of the actual AL6 and AL8 LCL tracks.
+
+This tutorial executes all nine public functions. For field-by-field examples
+of the input files, see the companion **LCL input structures and function guide**
+(`vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")`).
+
+| Function | Input | Result or purpose |
+|:--|:--|:--|
+| `example_data()` | Writable destination | Copies the small LCL dataset; returns paths, samples and regions |
+| `make_sample_sheet()` | Sample table or TSV | Validated `DataFrame` of sample paths and explicit formats |
+| `prepare_regions()` | Coordinates, `GRanges`, BED, GTF or GFF3 | Named `GRanges` of loci |
+| `extract_canonical_tss()` | GTF/GFF3 and selection attribute | Optional stricter `GRanges` of canonical TSSs |
+| `validate_inputs()` | Sample sheet and region ranges | Checks files, indexes, contigs and declared track formats |
+| `analyze_loci()` | Samples, regions and clustering choice | Named `SimpleList` of locus experiments |
+| `locus_profile()` | One locus experiment | Pooled or per-cluster fractions in a `DataFrame` |
+| `plot_locus()` | One locus experiment and panel type | Heatmap or ggplot object |
+| `write_locus_results()` | One experiment or the results list | RDS objects, TSV tables and PDF panels |
 
 ## Load the package and writable example
 
@@ -40,10 +56,15 @@ library(GenomicRanges)
 
 ```{r input}
 example <- example_data()
-example$samples[, c("sample_name", "sample_label", "m6a_format", "tf_format")]
-alas1 <- example$regions["ALAS1"]
+samples <- make_sample_sheet(file.path(example$directory, "samples.tsv"))
+samples[, c("sample_name", "sample_label", "m6a_format", "tf_format")]
+
+# regions.tsv has a header and BED (zero-based, half-open) coordinates.
+region_table <- read.delim(file.path(example$directory, "regions.tsv"))
+regions <- prepare_regions(region_table, coordinate_system = "bed")
+alas1 <- regions["ALAS1"]
 alas1
-validate_inputs(example$samples, alas1)
+validate_inputs(samples, alas1)
 ```
 
 The input region covers chr3:52197160-52199159, with a TSS at 52198160
@@ -58,7 +79,7 @@ The assay is sparse and binary: zero means no observed m6A call at that base,
 not a direct measurement that every base is an unmethylated adenine.
 
 ```{r unclustered}
-unclustered <- analyze_loci(example$samples, alas1, clustering = FALSE)[[1]]
+unclustered <- analyze_loci(samples, alas1, clustering = FALSE)[["ALAS1"]]
 unclustered
 colData(unclustered)[, c("sample_name", "original_RID", "start", "end")]
 ```
@@ -124,8 +145,8 @@ are saved with the experiment. Exact pairwise distances require memory
 quadratic in the number of reads, so select suitably sized loci and datasets.
 
 ```{r clustered}
-clustered <- analyze_loci(example$samples, alas1, clustering = TRUE,
-    k_neighbors = 10, resolution = 1, seed = 1)[[1]]
+clustered <- analyze_loci(samples, alas1, clustering = TRUE,
+    window_size = 0, k_neighbors = 10, resolution = 1, seed = 1)[["ALAS1"]]
 stopifnot(identical(assay(unclustered), assay(clustered)),
     identical(colnames(unclustered), colnames(clustered)),
     identical(locus_profile(unclustered), locus_profile(clustered)))
@@ -139,6 +160,7 @@ ComplexHeatmap::draw(plot_locus(clustered, "heatmap", clustered = TRUE))
 
 ```{r clustered-profile}
 plot_locus(clustered, "profile", clustered = TRUE)
+head(locus_profile(clustered, by_cluster = TRUE))
 ```
 
 ```{r clustered-footprints, fig.height=8}
@@ -149,20 +171,75 @@ Cluster plots only reorder reads or split profile denominators by existing
 cluster assignments. If a locus has fewer than three reads or two occupied
 features, clustering is skipped with a reason in `metadata`.
 
+### Choose bin size, nearest neighbors and resolution
+
+These are arguments to `analyze_loci()`; edit their values when starting an
+analysis. The current defaults are unchanged:
+
+| Argument | Default | Meaning |
+|:--|:--|:--|
+| `window_size` | `0` | No binning; cluster using individual observed m6A sites. A positive integer uses that bin width in bp. |
+| `k_neighbors` | `10` | Number of Manhattan nearest neighbors per read, capped at the number of reads minus one. |
+| `resolution` | `1` | Nonnegative Leiden resolution; larger values generally favor finer partitions. |
+| `seed` | `1` | Reproducible random seed for Leiden clustering. |
+
+With binning, windows start at the selected locus's first base. A read's
+feature is its mean call across sites observed in any retained read within
+that bin. Empty bins do not contribute clustering features. The underlying
+assay and heatmap stay at single-base resolution. `smoothing_bp = 10` is a
+separate setting for the profile curve, not the clustering bin width.
+
+For example, use 50-bp bins, five neighbors and resolution 0.5. These values
+are illustrative settings for the small dataset, not optimized parameters.
+
+```{r custom-clustering}
+custom <- analyze_loci(samples, alas1, clustering = TRUE,
+    window_size = 50, k_neighbors = 5, resolution = 0.5,
+    seed = 1)[["ALAS1"]]
+metadata(custom)$parameters[c("window_size", "k_neighbors", "resolution")]
+metadata(custom)$clustering$params$k_eff
+table(colData(custom)$sample_label, colData(custom)$cluster)
+
+# Binning and clustering parameters do not change the stored m6A assay
+# or the pooled profile and its full-span-read denominator.
+stopifnot(identical(assay(unclustered), assay(custom)),
+    identical(locus_profile(unclustered), locus_profile(custom)))
+```
+
+```{r custom-clustering-profile}
+plot_locus(custom, "profile", clustered = TRUE)
+```
+
+For `clustering = FALSE`, `window_size`, `k_neighbors` and `resolution` do not
+affect the analysis. To change a fitted partition, call `analyze_loci()` again
+with the desired settings; `plot_locus()` displays an existing result.
+
 ## Export and reload
 
-One call writes both views for this clustered result, alongside the complete
-Bioconductor object. The `unclustered` directory remains independent of
-clustering parameters. RDS files preserve the explicit clustering choice for
-later plotting; re-analysis requires a new explicit choice.
+Save both runs to separate, new directories under one output folder. The run
+without clustering writes only `unclustered/` panels. The run with clustering
+writes both `unclustered/` and `clustered/` panels alongside the complete
+Bioconductor object. The `unclustered` views remain independent of clustering
+parameters. RDS files preserve the choice and parameters for later plotting.
 
 ```{r export}
 output <- tempfile("alas1-output-")
-write_locus_results(clustered, output)
+write_locus_results(unclustered, file.path(output, "without-clustering"))
+write_locus_results(clustered, file.path(output, "with-clustering"))
 list.files(output, recursive = TRUE)
-restored <- readRDS(file.path(output, "ALAS1", "locus.rds"))
-stopifnot(identical(assay(restored), assay(clustered)))
+restored <- readRDS(file.path(output, "with-clustering", "ALAS1", "locus.rds"))
+stopifnot(identical(assay(restored), assay(clustered)),
+    identical(colData(restored), colData(clustered)),
+    identical(rowRanges(restored), rowRanges(clustered)))
 ```
+
+Within each `ALAS1/` directory, `locus.rds` is the complete experiment;
+`m6a_matrix.rds` contains only the sparse assay; `reads.tsv`, `qc.tsv` and
+`region.tsv` describe the reads and input region. Each view contains
+`m6a_heatmap.pdf`, `aggregate_m6a_profile.pdf`, `footprint_tracks.pdf`,
+`accessibility_profile.tsv`, `read_order.tsv` and `manifest.tsv`.
+The clustered view also contains `assignments.tsv` and `edges.tsv`.
+For persistent results, replace `tempfile()` with your own output directory.
 
 ## User data and plant annotations
 

@@ -13,9 +13,14 @@ analyze_loci(samples, regions, clustering, window_size = 0,
 \code{\link{make_sample_sheet}}.}
 \item{regions}{A named GRanges, normally from \code{\link{prepare_regions}}.}
 \item{clustering}{Required explicit TRUE or FALSE. Saved in result metadata.}
-\item{window_size}{Clustering feature width in bases; zero uses observed sites.}
-\item{k_neighbors}{Positive integer number of Manhattan nearest neighbors.}
-\item{resolution}{Nonnegative Leiden resolution.}
+\item{window_size}{Nonnegative integer clustering bin width in bases. The
+default, 0, uses individual observed sites. Positive widths average each
+read's calls across observed sites within each occupied bin. Bins start at
+the locus's first base. The stored assay remains single-base.}
+\item{k_neighbors}{Positive integer number of Manhattan nearest neighbors,
+default 10. The effective value is capped at the number of reads minus one.}
+\item{resolution}{Nonnegative Leiden resolution, default 1. Larger values
+generally favor finer partitions.}
 \item{seed}{Nonnegative integer seed for Leiden clustering.}
 \item{nuc_min, nuc_max}{Inclusive nucleosome size limits in bases.}
 \item{min_tf_score}{Minimum FiberHMM TF per-block score. BED6 is prefiltered.}
@@ -41,6 +46,11 @@ alignment ranges and per-read footprints synchronized. Metadata contain the
 original region, sample sheet, QC, parameters and optional clustering fit as
 run provenance; these summaries are not recalculated by generic subsetting.
 \code{locus_profile} recalculates denominators for the current columns.
+The clustering controls \code{window_size}, \code{k_neighbors} and
+\code{resolution} are ignored when \code{clustering = FALSE}. They do not
+change the unclustered assay or pooled profile. \code{smoothing_bp} controls
+profile smoothing independently of clustering bins. Settings are saved in
+\code{metadata(x)$parameters}; run \code{analyze_loci} again to change a fit.
 Clustering requires three reads and two occupied features; otherwise metadata
 record why it was skipped. Exact Manhattan distances use quadratic memory in
 the number of reads. This package analyzes processed tracks, not raw reads.}

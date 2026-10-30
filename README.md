@@ -47,19 +47,54 @@ Enable clustering explicitly:
 
 ```r
 clustered <- analyze_loci(example$samples, example$regions,
-    clustering = TRUE, k_neighbors = 10, resolution = 1, seed = 1)
+    clustering = TRUE, window_size = 0, k_neighbors = 10, resolution = 1, seed = 1)
 plot_locus(clustered[["ALAS1"]], "heatmap", clustered = TRUE)
 plot_locus(clustered[["ALAS1"]], "profile", clustered = TRUE)
 write_locus_results(clustered, "my-clustered-results")
 ```
 
-The full executable tutorial is
-[vignettes/ALAS1-clustered-and-unclustered.Rmd](vignettes/ALAS1-clustered-and-unclustered.Rmd).
-After installing a built release, open it with:
+Change clustering bin width, nearest-neighbor count and Leiden resolution by
+passing your chosen values. The current defaults remain `window_size = 0`
+(individual observed sites), `k_neighbors = 10`, and `resolution = 1`:
+
+```r
+binned <- analyze_loci(example$samples, example$regions,
+    clustering = TRUE, window_size = 50, k_neighbors = 5, resolution = 0.5)
+```
+
+Binning affects clustering features; the stored assay remains single-base.
+Each occupied bin contains each read's mean call across observed sites in
+that bin. `smoothing_bp = 10` separately controls profile smoothing. Changing
+the three clustering settings does not change the pooled profile.
+
+Two executable vignettes cover all nine public functions:
+
+- [ALAS1 with and without clustering](vignettes/ALAS1-clustered-and-unclustered.Rmd):
+  all three plot types in both modes, adjustable clustering and result export.
+- [LCL input structures and function guide](vignettes/LCL-input-structures.Rmd):
+  actual AL6/AL8 sample sheets and records, coordinates, annotations, optional
+  tracks, and the mapping to `GRanges` and `SummarizedExperiment`.
+
+After installing a built release, open them with:
 
 ```r
 vignette("ALAS1-clustered-and-unclustered", package = "selectFiberseqLociWorkflow")
+vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")
 ```
+
+To include vignettes when installing from GitHub, set `build_vignettes = TRUE`
+in `remotes::install_github()`, with `knitr`, `rmarkdown` and Pandoc available.
+To knit local HTML previews from the package root after installing the package:
+
+```r
+rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
+rmarkdown::render("vignettes/LCL-input-structures.Rmd")
+```
+
+Local HTML previews are written beside their R Markdown sources and ignored
+by Git and source-package builds. `R CMD build` builds the installed vignettes
+from their R Markdown sources. You can share the self-contained HTML files
+directly or attach them to a GitHub Release.
 
 ## Your own samples and regions
 
@@ -195,4 +230,3 @@ library(selectFiberseqLociWorkflow)
 e <- example_data()
 result <- analyze_loci(e$samples, e$regions, clustering = FALSE)
 ```
-

@@ -1,0 +1,539 @@
+---
+title: "LCL input structures and function guide"
+author: "Crystal Shan"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{LCL input structures and function guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+    fig.width = 9, fig.height = 5, error = FALSE)
+```
+
+## From LCL track files to a locus experiment
+
+This guide uses the package's subset of the actual **AL6_bc2162_19093** and
+**AL8_bc2170_19151** LCL files at **ALAS1** and **PRDX1**. It shows the input
+fields, coordinate conversions and R objects at each step. These are small
+processed track files, with matching complete records and regenerated tabix
+indexes. The subset is capped at 100 full-span reads per sample per locus;
+the available totals are 18 reads at ALAS1 and 16 at PRDX1.
+
+All analysis runs in R. The package expects processed tracks rather than BAM
+or FASTQ files. See **Select Fiber-seq loci: ALAS1 with and without clustering**
+for the full set of clustered and unclustered panels.
+
+| Function | Accepted input | Output / next step |
+|:--|:--|:--|
+| `example_data()` | New or empty writable directory | A list containing `samples`, `regions` and `directory` |
+| `make_sample_sheet()` | `data.frame`, `DataFrame`, or a headered TSV path | Sample `DataFrame` for validation and analysis |
+| `prepare_regions()` | `GRanges`, coordinate table/string, headerless BED, or GTF/GFF3 | Named `GRanges` for validation and analysis |
+| `extract_canonical_tss()` | GTF/GFF3 with a specified canonical attribute | Optional alternative source of region `GRanges` |
+| `validate_inputs()` | Sample sheet plus region `GRanges` | Invisible `TRUE`, or an informative error |
+| `analyze_loci()` | Samples, regions and explicit clustering choice | Named `SimpleList` of `RangedSummarizedExperiment` objects |
+| `locus_profile()` | One locus experiment | `DataFrame` of pooled or cluster-wise fractions |
+| `plot_locus()` | One locus experiment, panel type and view | `ComplexHeatmap::Heatmap` or ggplot object |
+| `write_locus_results()` | One experiment or the whole results list | RDS, TSV and PDF files in a new or empty directory |
+
+## 1. Copy the example into a writable directory
+
+```{r copy-example}
+library(selectFiberseqLociWorkflow)
+library(SummarizedExperiment)
+library(GenomicRanges)
+
+example <- example_data()
+names(example)
+list.files(example$directory)
+```
+
+`example$directory` is a temporary writable copy. To keep the inputs, supply a
+persistent destination, for example `example_data("my-LCL-example")`.
+`samples.tsv` and `regions.tsv` describe the files under `tracks/`.
+`provenance.json` records original source paths and selected read IDs;
+`SHA256SUMS` records checksums. The subset-generation script is installed at
+`system.file("scripts", "build_example.py", package = "selectFiberseqLociWorkflow")`.
+The examples below use only this copied dataset and installed package files.
+
+## 2. Sample sheet: one row per sample
+
+Read the actual TSV as an ordinary R table to inspect its fields:
+
+```{r raw-sample-sheet}
+sample_table <- read.delim(file.path(example$directory, "samples.tsv"),
+    stringsAsFactors = FALSE, check.names = FALSE)
+knitr::kable(sample_table[, c("sample_name", "sample_label", "m6a")])
+knitr::kable(sample_table[1, c("m6a_format", "nucleosome_format",
+    "tf_format", "fire_format")], row.names = FALSE)
+```
+
+| Column(s) | Required? | Meaning |
+|:--|:--|:--|
+| `sample_name` | Yes | Unique read namespace and sample key; use letters, digits, `_`, `.` or `-` |
+| `sample_label` | No | Display label; defaults to `sample_name` |
+| `m6a`, `m6a_format` | Yes | Path/template and explicit modification-track format |
+| `nucleosome`, `nucleosome_format` | No | Path/template and format for a supplied nucleosome track |
+| `tf`, `tf_format` | No | Path/template and format for supplied TF footprints |
+| `fire`, `fire_format` | No | Path/template and format for a supplied FIRE track |
+
+`make_sample_sheet()` normalizes this table to an `S4Vectors::DataFrame`.
+For an in-memory table, `base_dir` resolves relative paths. For a TSV filename,
+paths are resolved relative to the TSV's directory. Optional tracks can be
+omitted or have blank paths; a supplied path needs its matching format.
+
+```{r normalized-sample-sheet}
+samples <- make_sample_sheet(sample_table, base_dir = example$directory)
+from_tsv <- make_sample_sheet(file.path(example$directory, "samples.tsv"))
+stopifnot(identical(samples, from_tsv))
+class(samples)
+samples[, c("sample_name", "sample_label", "m6a_format", "tf_format")]
+
+# Save a new sample sheet with resolved paths and read it back.
+saved_sheet <- tempfile(fileext = ".tsv")
+make_sample_sheet(sample_table, base_dir = example$directory,
+    output = saved_sheet)
+stopifnot(identical(samples, make_sample_sheet(saved_sheet)))
+```
+
+Only `{sample_name}` and `{chr}` are supported placeholders. The actual LCL
+sheet uses sample-specific folders and `{chr}`. A single genome-wide file per
+sample can instead be supplied without `{chr}`. Each supplied track must be
+**bgzip-compressed, sorted and tabix-indexed**, with its `.tbi` beside it.
+
+This is the same LCL sheet expressed using both placeholders:
+
+```{r sample-template}
+template_table <- sample_table
+for (track in c("m6a", "nucleosome", "tf", "fire")) {
+    template_table[[track]] <- paste0("tracks/{sample_name}/", track,
+        ".{chr}.bed.gz")
+}
+template_samples <- make_sample_sheet(template_table,
+    base_dir = example$directory)
+```
+
+## 3. Regions: declare the coordinate convention
+
+The actual `regions.tsv` is a **headered table**. Its `start` and `end` use BED
+coordinates: zero-based start, end excluded. Its `tss` is one-based. Read the
+table first, then declare `coordinate_system = "bed"`:
+
+```{r region-table}
+region_table <- read.delim(file.path(example$directory, "regions.tsv"))
+knitr::kable(region_table[, c("region_id", "chr", "start", "end",
+    "strand", "tss")])
+regions <- prepare_regions(region_table, coordinate_system = "bed")
+regions
+alas1 <- regions["ALAS1"]
+```
+
+The ALAS1 interval `[52197159, 52199159)` becomes
+`chr3:52197160-52199159` in R: 2,000 bases, one-based inclusive. PRDX1 is on the
+minus strand, but its genomic start is still less than its end. Coordinates
+are not reversed for minus-strand loci.
+
+| Input to `prepare_regions()` | Coordinate convention | Details |
+|:--|:--|:--|
+| `GRanges` | One-based inclusive | Preserves sequence information; names identify regions |
+| `data.frame` / `DataFrame` | Explicit `"bed"` or `"one_based"` | Required `chr`, `start`, `end`; optional `region_id`, `strand`, `tss` |
+| Headerless BED path | Zero-based, half-open | First three fields are contig/start/end; field 4 is region ID and field 6 is strand |
+| `"chr3:52197160-52199159"` | One-based inclusive | Plain coordinate string; no TSS or gene metadata inferred |
+| `annotation = "file.gtf"` or `"file.gff3"` | One-based annotation coordinates | Transcript features define TSSs; see annotation examples below |
+| Custom single-base TSS BED | Zero-based, half-open | Optional `bed_annotation = "gencode_custom"`; name field is `geneID;annotation;geneName` |
+
+Do not pass a headered `regions.tsv` directly as a BED filename. `flank_bp`
+expands annotation-derived TSSs or custom TSS BEDs; ordinary coordinate inputs
+already specify the full analysis interval.
+
+The following representations all describe the same ALAS1 interval:
+
+```{r equivalent-region-inputs}
+one_based <- region_table[region_table$region_id == "ALAS1", ]
+one_based$start <- one_based$start + 1L
+from_one_based <- prepare_regions(one_based, coordinate_system = "one_based")
+from_string <- prepare_regions("chr3:52197160-52199159")
+from_granges <- prepare_regions(alas1)
+
+bed_file <- tempfile(fileext = ".bed")
+write.table(data.frame(chr = "chr3", start = 52197159, end = 52199159,
+    name = "ALAS1", score = 0, strand = "+"), bed_file,
+    sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+from_bed <- prepare_regions(bed_file)
+
+for (r in list(from_one_based, from_string, from_granges, from_bed)) {
+    stopifnot(as.character(seqnames(r)) == "chr3",
+        start(r) == start(alas1), end(r) == end(alas1))
+}
+
+# Exported region tables also use BED start/end and one-based TSS.
+saved_regions <- tempfile(fileext = ".tsv")
+prepare_regions(regions, output = saved_regions)
+round_trip <- prepare_regions(read.delim(saved_regions),
+    coordinate_system = "bed")
+stopifnot(identical(start(round_trip), start(regions)),
+    identical(end(round_trip), end(regions)),
+    identical(mcols(round_trip)$tss, mcols(regions)$tss))
+```
+
+Contig names must match exactly between regions and track indexes, including
+case. No chromosome prefix conversion or genome-assembly conversion is done.
+
+## 4. Inspect a real record from each LCL track
+
+The format is declared in the sample sheet, not guessed from the filename or
+from whether the user ran fibertools or FiberHMM. These are the supported
+formats; the LCL subset uses the four marked in the final column.
+
+| Track | Format string | Fields | Present in this LCL subset? |
+|:--|:--|:--|:--|
+| m6A | `bed12_fibertools` | BED12 blocks, including terminal sentinel blocks | Yes |
+| Nucleosome | `bed12_fibertools` | BED12 blocks, including terminal sentinel blocks | Yes |
+| Nucleosome | `bed13_fiberhmm` | BED12 plus per-block scores; no sentinel removal | No; supported alternative |
+| TF | `bed15_fiberhmm_tf` | BED12 plus block scores and left/right edge-score vectors | Yes |
+| TF | `bed6_per_sample` | `chr`, `start`, `end`, `RID`, `score`, `strand`; one prefiltered interval per row | No; supported alternative |
+| FIRE | `bed11_fire` | Per-read interval with FIRE score and a trailing tag | Yes |
+
+Here are the first actual AL6 records on chr3. The short helper below is only
+for displaying a few lines in this vignette; it is not a package function.
+Comma-separated block vectors are truncated in the display, not in the files.
+
+```{r inspect-track-records}
+track_names <- c("m6a", "nucleosome", "tf", "fire")
+track_files <- vapply(track_names, function(track)
+    sub("{chr}", "chr3", samples[[track]][1], fixed = TRUE), character(1))
+stopifnot(all(file.exists(track_files)),
+    all(file.exists(paste0(track_files, ".tbi"))))
+
+read_first_record <- function(path) {
+    con <- gzfile(path, open = "rt")
+    on.exit(close(con))
+    strsplit(readLines(con, n = 1L), "\t", fixed = TRUE)[[1]]
+}
+raw_records <- lapply(track_files, read_first_record)
+bed12_fields <- c("chrom", "chromStart", "chromEnd", "RID", "score", "strand",
+    "thickStart", "thickEnd", "itemRgb", "blockCount", "blockSizes",
+    "blockStarts")
+field_names <- list(m6a = bed12_fields, nucleosome = bed12_fields,
+    tf = c(bed12_fields, "blockScores", "leftEdgeScores", "rightEdgeScores"),
+    fire = c(bed12_fields[1:9], "fire_score", "tag"))
+record_preview <- do.call(rbind, lapply(track_names, function(track) {
+    values <- raw_records[[track]]
+    data.frame(track = track, field = seq_along(values),
+        name = field_names[[track]],
+        value = ifelse(nchar(values) > 65L,
+            paste0(substr(values, 1L, 65L), "..."), values))
+}))
+knitr::kable(record_preview, row.names = FALSE)
+```
+
+For BED12, fields 2 and 3 are the alignment's BED bounds; `blockStarts` are
+offsets from field 2. Block vectors have `blockCount` entries. Fibertools'
+first and last blocks are sentinels and are removed before calls are used.
+m6A interior blocks must each be one base wide. Reads with no interior m6A
+calls in the selected region still contribute to the denominator if they
+span the region.
+
+For the actual TF BED15, field 13 contains scores for individual blocks.
+`min_tf_score = 50` filters those scores, not field 5. Retained TF width
+classes are [10,30), [40,60) and [60,80) bp. BED6 TF intervals are expected to
+be score-filtered already; the same width classes apply. The default retained
+nucleosome widths are 130 through 160 bp inclusive.
+
+FIRE records are per-read intervals, joined by their original RID. The trailing
+tag may contain legacy haplotype labels in these source files; the package
+does not use that field to phase or split reads. Allele-specific RDS inputs
+are not needed. Optional track RIDs must match the m6A RIDs within each sample;
+records for reads excluded by full-span filtering do not enter the result.
+
+### Follow one m6A call into R coordinates
+
+Use the first actual AL6 record and one of its interior calls inside ALAS1:
+
+```{r one-real-call}
+raw_m6a <- raw_records$m6a
+block_offsets <- as.integer(strsplit(raw_m6a[12], ",", fixed = TRUE)[[1]])
+block_sizes <- as.integer(strsplit(raw_m6a[11], ",", fixed = TRUE)[[1]])
+interior <- seq_along(block_offsets)
+interior <- interior[-c(1L, length(interior))]
+call_positions <- as.integer(raw_m6a[2]) + block_offsets[interior] + 1L
+inside <- which(call_positions >= start(alas1) & call_positions <= end(alas1))
+chosen <- interior[inside[1L]]
+chosen_position <- as.integer(raw_m6a[2]) + block_offsets[chosen] + 1L
+knitr::kable(data.frame(original_RID = raw_m6a[4],
+    alignment_start_BED = as.integer(raw_m6a[2]),
+    block_offset = block_offsets[chosen], block_width = block_sizes[chosen],
+    position_in_R = chosen_position))
+```
+
+The formula is `position_in_R = chromStart + blockStart + 1`. We will locate
+this exact call in the sparse assay below.
+
+## 5. Validate and analyze
+
+`validate_inputs()` checks file/index availability, the required m6A contigs,
+and declared record structure in sampled records. Parsing during analysis
+performs further checks on records in the requested region. It does not
+certify every record in a whole-genome file.
+
+```{r validation}
+validate_inputs(samples, regions)
+validate_inputs(template_samples, regions)
+
+# An expected error: a supported TF format cannot be used for m6A.
+bad_samples <- samples
+bad_samples$m6a_format <- "bed15_fiberhmm_tf"
+tryCatch(validate_inputs(bad_samples, alas1), error = conditionMessage)
+```
+
+Choose clustering explicitly. This run makes both LCL loci without clustering:
+
+```{r analyze-lcl}
+results <- analyze_loci(samples, regions, clustering = FALSE)
+names(results)
+x <- results[["ALAS1"]]
+x
+metadata(x)$qc
+data.frame(locus = names(results),
+    bases = vapply(results, nrow, integer(1)),
+    reads = vapply(results, ncol, integer(1)))
+```
+
+Only the longest overlapping alignment of a read is considered, and it must
+span the entire region. All retained reads, including those with zero m6A
+calls, remain in the matrix. The standard read order is sample-sheet order,
+alignment start, then RID.
+
+## 6. How `GRanges`, the assay and `colData` agree
+
+`results` is a named `SimpleList`. Each element is a
+`RangedSummarizedExperiment` with **genomic bases in rows and reads in columns**.
+`assay(x, "m6a")` is a sparse binary matrix. A zero means no observed m6A call
+at that genomic position, not an experimentally measured unmethylated adenine.
+
+| Component | Structure | Alignment with the assay |
+|:--|:--|:--|
+| `rowRanges(x)` | Single-base `GRanges`, one-based inclusive | One range and matching row name per assay row |
+| `colData(x)` | `DataFrame` of read metadata | One row and matching RID per assay column |
+| `colData(x)$read_range` | `GRanges` of full alignments | One alignment per assay column; agrees with `chr`, `start`, `end`, `strand` |
+| `colData(x)$footprints` | `GRangesList` | One list element per read, with `RID`, `track` and `class` metadata on its intervals |
+| `metadata(x)` | List | Original region, sample sheet, QC, parameters and optional clustering provenance |
+
+The column ID is `sample_name::original_RID`, so the same original RID in two
+samples does not collide. All in-memory alignment and footprint coordinates
+are one-based inclusive. Stored footprints can extend beyond the locus if an
+original call overlaps its boundary.
+
+```{r aligned-containers}
+class(assay(x, "m6a"))
+rowRanges(x)[1:3]
+colData(x)[1:3, c("RID", "original_RID", "sample_name", "start", "end")]
+colData(x)$read_range[1:3]
+colData(x)$footprints[1]
+
+rid <- paste(samples$sample_name[1], raw_m6a[4], sep = "::")
+row_id <- paste("chr3", chosen_position, sep = ":")
+assay(x, "m6a")[row_id, rid]
+stopifnot(assay(x, "m6a")[row_id, rid] == 1,
+    identical(names(rowRanges(x)), rownames(x)),
+    identical(rownames(colData(x)), colnames(x)),
+    identical(colData(x)$RID, colnames(x)),
+    all(start(colData(x)$read_range) == colData(x)$start),
+    all(end(colData(x)$read_range) == colData(x)$end))
+```
+
+### Subset using the standard Bioconductor interface
+
+```{r subset-experiment}
+small <- x[1:20, c(3, 1)]
+stopifnot(identical(colnames(small), rownames(colData(small))),
+    identical(colData(small)$read_range, colData(x)$read_range[c(3, 1)]),
+    identical(colData(small)$footprints, colData(x)$footprints[c(3, 1)]))
+small
+```
+
+Subsetting keeps ranges and read metadata attached to the correct assay
+columns. Row subsetting does not clip the stored footprint intervals, and
+`metadata` keeps the original run's QC and clustering graph as provenance.
+For the current subset's fractions, use `locus_profile(small)`; it recomputes
+the denominator from the currently selected read columns.
+
+## 7. Profiles, plots and optional clustering
+
+`locus_profile()` returns `pos` (one-based), `group`, `cov` (number of retained
+reads), `met` (reads with a call), `frac = met / cov`, and the smoothed fields
+`smooth_cov` and `smooth_frac`. The `base` field is labeled `A` for m6A; the
+package does not fetch a reference sequence. Only positions observed in at
+least one retained read are reported, except that an all-zero locus returns
+all positions. A locus with no full-span reads has `NA` fractions.
+
+```{r profile-and-plot}
+profile <- locus_profile(x)
+head(profile)
+stopifnot(all(profile$cov == ncol(x)),
+    isTRUE(all.equal(profile$frac, profile$met / ncol(x))))
+plot_locus(x, "profile")
+```
+
+Use `plot_locus(x, "heatmap")` for a `ComplexHeatmap::Heatmap` object and draw
+it with `ComplexHeatmap::draw()`. `"profile"` and `"footprints"` return ggplot
+objects. The analysis vignette executes all three panel types in both modes.
+
+Clustering controls are user-settable arguments. The defaults are
+**`window_size = 0`, `k_neighbors = 10`, `resolution = 1`**. Zero bin size means
+individual observed sites; a positive integer sets clustering-bin width in bp.
+The bin feature is each read's mean call across observed sites in that bin.
+The assay remains single-base. Neighbors are capped at `ncol(x) - 1`;
+resolution is a nonnegative Leiden parameter. `smoothing_bp = 10` separately
+controls the profile smoothing width.
+
+```{r cluster-with-chosen-settings}
+# These explicit values are the current defaults.
+clustered <- analyze_loci(samples, alas1, clustering = TRUE,
+    window_size = 0, k_neighbors = 10, resolution = 1, seed = 1)[["ALAS1"]]
+colData(clustered)[1:3, c("RID", "cluster")]
+head(locus_profile(clustered, by_cluster = TRUE))
+stopifnot(identical(assay(x), assay(clustered)),
+    identical(locus_profile(x), locus_profile(clustered)))
+
+# Change the controls for a new fit; no package code needs editing.
+binned <- analyze_loci(samples, alas1, clustering = TRUE,
+    window_size = 50, k_neighbors = 5, resolution = 0.5)[["ALAS1"]]
+metadata(binned)$parameters[c("window_size", "k_neighbors", "resolution")]
+```
+
+`plot_locus(clustered, "profile", clustered = TRUE)` uses a separate denominator
+for each existing cluster. The `clustered` plot argument does not fit a model.
+With fewer than three reads or two occupied features, clustering is skipped;
+inspect `metadata(x)$clustering_status` before requesting cluster views of
+other datasets. Unclustered results are independent of clustering parameters.
+
+## 8. Omitted, empty and missing optional tracks
+
+An m6A-only sheet is valid. It produces the same m6A assay and profile, with
+empty footprint ranges. Omitting optional tracks produces no empty-footprint
+warning:
+
+```{r m6a-only}
+minimal_samples <- make_sample_sheet(samples[,
+    c("sample_name", "sample_label", "m6a", "m6a_format")])
+minimal <- analyze_loci(minimal_samples, alas1, clustering = FALSE)[["ALAS1"]]
+stopifnot(identical(assay(minimal), assay(x)),
+    all(lengths(colData(minimal)$footprints) == 0L))
+metadata(minimal)$supplied_tracks
+```
+
+A **supplied** nucleosome or TF track that has no retained footprints in the
+region raises the warning:
+
+> no footprints called in the selected region
+
+Analysis continues, and `metadata(x)$empty_footprint_tracks` records the
+affected track types with no retained calls across the supplied samples.
+This can also happen after size or score filtering.
+A supplied nonexistent file or missing `.tbi` is instead an input error.
+
+## 9. GTF/GFF3 annotations and optional canonical selection
+
+The LCL examples above use their actual coordinate table. The following
+annotation files are **synthetic plant fixtures**, included to illustrate
+additional accepted input structures without misrepresenting them as LCL
+GENCODE annotations.
+
+GTF needs transcript feature rows with `gene_id`, `transcript_id` and strand;
+`gene_name` is optional. GFF3 needs transcript/mRNA rows with unique `ID` and
+gene `Parent` relationships. Gene rows with `ID` and `Name` supply gene names.
+Exon-only files are insufficient. Coordinates and contig names are preserved.
+
+```{r annotation-structures}
+gff <- system.file("extdata", "plant", "annotation.gff3",
+    package = "selectFiberseqLociWorkflow")
+gtf <- system.file("extdata", "plant", "annotation.gtf",
+    package = "selectFiberseqLociWorkflow")
+cat(paste(readLines(gff), collapse = "\n"), "\n")
+cat(readLines(gtf)[1], "\n")
+```
+
+Ordinary extraction does not require canonical tags. A plus-strand TSS is
+the transcript start; a minus-strand TSS is its end. Distinct TSSs are retained;
+transcripts sharing a gene/TSS/strand are recorded together in `transcript_ids`.
+The default `flank_bp = 1000` produces `[TSS - 1000, TSS + 999]` in one-based
+inclusive coordinates; `flank_bp = 0` returns one-base TSSs. Windows extending
+before position 1 are rejected.
+
+```{r ordinary-annotations}
+plant_regions <- prepare_regions(annotation = gff)
+plant_regions
+prepare_regions(annotation = gff, genes = "PlantGene2", flank_bp = 0)
+prepare_regions(annotation = gff, transcripts = "AT5G00010.2", flank_bp = 500)
+prepare_regions(annotation = gtf, genes = "AT5G00010")
+```
+
+`extract_canonical_tss()` is an optional stricter helper. Its default is
+`attribute = "tag", value = "Ensembl_canonical"`, suitable for tagged GTFs.
+A different attribute/value pair can be specified for GFF3. Unlike ordinary
+region preparation, its default `flank_bp = 0` returns just the TSS; supply
+`flank_bp = 1000` to analyze a promoter window.
+
+```{r canonical-annotations}
+extract_canonical_tss(gtf, genes = "AT5G00010", flank_bp = 1000)
+extract_canonical_tss(gff, genes = "AT5G00010",
+    attribute = "canonical", value = "true", flank_bp = 1000)
+
+# Expected error: this GFF3 gene has no canonical tag. Ordinary extraction
+# above succeeds because it does not require that tag.
+tryCatch(extract_canonical_tss(gff, genes = "PlantGene2",
+    attribute = "canonical", value = "true"), error = conditionMessage)
+```
+
+Each selected gene must have exactly one matching canonical transcript;
+missing or ambiguous selections are reported as errors. Plant regions can be
+analyzed with the same `analyze_loci()` call when the supplied processed tracks
+use these exact contigs and supported formats. Do not pair the plant fixture
+coordinates with the human LCL tracks.
+
+## 10. Save results and load them again
+
+`write_locus_results()` accepts either one experiment or the entire named list.
+This example saves both loci without clustering; the main analysis vignette
+also saves a clustered run with both plot views.
+
+```{r export-input-guide}
+output <- tempfile("lcl-results-")
+write_locus_results(results, output)
+list.files(file.path(output, "ALAS1"), recursive = TRUE)
+restored <- readRDS(file.path(output, "ALAS1", "locus.rds"))
+stopifnot(identical(assay(restored), assay(x)),
+    identical(rowRanges(restored), rowRanges(x)),
+    identical(colData(restored), colData(x)))
+```
+
+| File or directory within each locus | Contents |
+|:--|:--|
+| `locus.rds` | Complete experiment, including range columns and parameters |
+| `m6a_matrix.rds` | Sparse assay only |
+| `reads.tsv` | Flattened read metadata; `read_range` and `footprints` remain in the RDS |
+| `qc.tsv` | Per-sample overlapping and full-span read counts |
+| `region.tsv` | Headered BED-coordinate table with one-based TSS |
+| `unclustered/` | `m6a_heatmap.pdf`, `aggregate_m6a_profile.pdf`, `footprint_tracks.pdf`, `accessibility_profile.tsv`, `read_order.tsv`, `manifest.tsv` |
+| `clustered/` | Additional views after successful clustering; also `assignments.tsv` and `edges.tsv` |
+
+When optional tracks are omitted, `footprint_tracks.pdf` is omitted and the
+manifest explains why. With no full-span reads, the experiment still has the
+region's rows but zero columns; the manifest reports empty panels. Locus
+directory names come from region IDs, with unsafe filename characters replaced
+by underscores; colliding names are rejected.
+
+The complete `locus.rds` is the file to reload for plotting and Bioconductor
+interoperability. Use a persistent output directory instead of `tempfile()`
+to retain results after the R session ends.
+
+## Session information
+
+```{r session}
+sessionInfo()
+```
