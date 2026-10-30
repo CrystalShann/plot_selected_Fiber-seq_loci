@@ -28,10 +28,8 @@ install.packages("selectFiberseqLociWorkflow_0.99.0.tar.gz",
 
 ## Step-by-step analysis
 
-Follow steps 1–10 in order. Replace the example paths and coordinates with your
-own data. The workflow supports human, plant and other genomes without a species
-setting. To try it with bundled data, use the test-data alternatives in steps 2
-and 4, then continue with the same remaining steps.
+Follow steps 1–10 in order. 
+Replace the example paths and coordinates with your own data. The workflow inputs processed after Fibertools/FiberHMM, for all species and genome build.
 
 ### 1. Load the package
 
