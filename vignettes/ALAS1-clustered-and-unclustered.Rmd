@@ -31,7 +31,7 @@ The data provenance and reproducible subset-generation script accompany the
 package. The example files are a subset of the actual AL6 and AL8 LCL tracks.
 
 This tutorial executes all ten public functions. For field-by-field examples
-of the input files, see the companion **LCL input structures and function guide**
+of the input files, see the companion **Overview of the functions**
 (`vignette("LCL-input-structures", package = "selectFiberseqLociWorkflow")`).
 
 | Function | Input | Result or purpose |
@@ -132,13 +132,18 @@ plot_locus(unclustered, "profile")
 head(locus_profile(unclustered))
 ```
 
-Optional tracks use nucleosomes of 130-160 bp and TF footprints in [10,30),
+By default, optional tracks use nucleosomes of 130-160 bp and TF footprints in [10,30),
 [40,60), or [60,80) bp. FiberHMM TF blocks require a score of at least 50.
 The footprint figure stacks the accessibility profile, blue m6A reads, and
 overlaid FIRE/nucleosome/TF tracks, with relative panel heights 2:6:6.
 FIRE is orange, nucleosomes are dark blue, and the three TF size classes are
 purple, magenta and cyan. Both read panels include the same sample-first
 annotations and read order as the heatmap.
+
+TF length classes can be changed with `analyze_loci(tf_length_ranges =
+list(c(30, 39), c(80, 120)), ...)`, using inclusive bounds. Use
+`tf_length_ranges = NULL` to retain all positive lengths. This applies to
+both FiberHMM BED15 and custom BED6 TF inputs.
 
 A supplied footprint track with no retained calls raises the warning
 `no footprints called in the selected region`; the analysis still completes.

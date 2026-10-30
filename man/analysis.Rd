@@ -6,7 +6,8 @@ optionally cluster them using Manhattan distances and Leiden communities.}
 \usage{
 analyze_loci(samples, regions, clustering, window_size = 0,
     k_neighbors = 10, resolution = 1, seed = 1, nuc_min = 130,
-    nuc_max = 160, min_tf_score = 50, smoothing_bp = 10)
+    nuc_max = 160, min_tf_score = 50, smoothing_bp = 10,
+    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79)))
 }
 \arguments{
 \item{samples}{A sample DataFrame, data.frame or TSV path; see
@@ -24,6 +25,12 @@ generally favor finer partitions.}
 \item{seed}{Nonnegative integer seed for Leiden clustering.}
 \item{nuc_min, nuc_max}{Inclusive nucleosome size limits in bases.}
 \item{min_tf_score}{Minimum FiberHMM TF per-block score. BED6 is prefiltered.}
+\item{tf_length_ranges}{NULL to retain all positive TF footprint lengths, or a
+nonempty list of nonoverlapping inclusive c(min, max) pairs in bp. Bounds must
+be positive integers. For example, list(c(30, 39), c(80, 120)) selects two
+custom classes and list(c(35, 35)) selects exactly 35 bp. Applies to both
+FiberHMM BED15 and prefiltered BED6 TF inputs, independently of score filtering.
+Defaults preserve the original 10--29, 40--59 and 60--79 bp classes.}
 \item{smoothing_bp}{Positive integer accessibility smoothing width in bases.}
 }
 \value{A named S4Vectors SimpleList of RangedSummarizedExperiment objects.
@@ -37,7 +44,8 @@ colData$cluster without changing assay or read order.}
 \details{Only the longest overlapping alignment per read is considered; it
 must span the entire locus. Reads with zero m6A calls remain in the assay and
 denominators. Fibertools sentinel blocks are removed; FiberHMM blocks are not.
-TF size classes are [10,30), [40,60), [60,80) bp. A supplied footprint track
+TF length classes are set by \code{tf_length_ranges}; filtering uses original
+footprint widths before clipping for display. A supplied footprint track
 with no retained calls triggers the warning ``no footprints called in the
 selected region''. Empty loci return zero-column experiments.
 

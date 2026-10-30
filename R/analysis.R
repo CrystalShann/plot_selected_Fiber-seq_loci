@@ -1,7 +1,8 @@
 ## Native R analysis. The assay is positions x reads throughout the public API.
 analyze_loci <- function(samples, regions, clustering,
     window_size = 0, k_neighbors = 10, resolution = 1, seed = 1,
-    nuc_min = 130, nuc_max = 160, min_tf_score = 50, smoothing_bp = 10) {
+    nuc_min = 130, nuc_max = 160, min_tf_score = 50, smoothing_bp = 10,
+    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79))) {
     if (missing(clustering) || !is.logical(clustering) ||
         length(clustering) != 1L || is.na(clustering))
         stop("Choose clustering = TRUE or FALSE explicitly")
@@ -13,13 +14,14 @@ analyze_loci <- function(samples, regions, clustering,
     ints <- c(window_size, k_neighbors, seed, smoothing_bp)
     if (any(ints != floor(ints)) || k_neighbors < 1 || smoothing_bp < 1 ||
         nuc_min > nuc_max) stop("Invalid integer parameters or size bounds")
+    .validate_tf_length_ranges(tf_length_ranges)
     samples <- make_sample_sheet(samples)
     regions <- prepare_regions(regions)
     validate_inputs(samples, regions)
     parameters <- list(clustering = clustering, window_size = window_size,
         k_neighbors = k_neighbors, resolution = resolution, seed = seed,
         nuc_min = nuc_min, nuc_max = nuc_max, min_tf_score = min_tf_score,
-        smoothing_bp = smoothing_bp)
+        smoothing_bp = smoothing_bp, tf_length_ranges = tf_length_ranges)
     ans <- lapply(seq_along(regions), function(i)
         .analyze_region(samples, regions[i], parameters))
     names(ans) <- names(regions)

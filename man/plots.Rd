@@ -30,7 +30,8 @@ Plots use the current assay columns and do not alter the experiment.
 Heatmaps use black m6A calls, genomic coordinate ticks and a dashed TSS line.
 The footprint composition stacks the accessibility profile, blue m6A calls,
 and overlaid FIRE (orange), nucleosome (dark blue), and TF footprint tracks
-(purple, magenta and cyan for the three supported size classes).
+(purple, magenta and cyan for the default size classes, with automatic colors
+for custom TF length ranges).
 Every read panel places sample annotations farthest left, followed by cluster
 annotations when enabled. Clusters use \code{\link{cluster_colors}} throughout.
 Sample colors use the Dynamic palette in sample-sheet label order.

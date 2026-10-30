@@ -184,6 +184,11 @@ plot_locus <- function(x, type = c("heatmap", "profile", "footprints"),
             nucleosome = "darkblue", "size10-30" = "purple",
             "size40-60" = "magenta", "size60-80" = "#41c4e1")
         colors[nuc_label] <- "darkblue"
+        tf_classes <- sort(unique(d$class[d$track == "tf"]))
+        custom_classes <- setdiff(tf_classes, names(colors))
+        if (length(custom_classes))
+            colors[custom_classes] <- grDevices::hcl.colors(
+                length(custom_classes), palette = "Dark 3")
         footprints <- footprints + ggplot2::scale_colour_manual(values = colors,
             name = "class", guide = ggplot2::guide_legend(order = 2))
     }

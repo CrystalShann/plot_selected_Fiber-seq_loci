@@ -1,3 +1,19 @@
+.validate_tf_length_ranges <- function(ranges) {
+    if (is.null(ranges)) return(invisible(NULL))
+    valid <- is.list(ranges) && length(ranges) > 0L &&
+        all(vapply(ranges, function(r) is.numeric(r) && length(r) == 2L &&
+            all(is.finite(r)) && all(r >= 1) && all(r == floor(r)) &&
+            r[1] <= r[2], logical(1)))
+    if (!valid)
+        stop("tf_length_ranges must be NULL or a nonempty list of positive integer c(min, max) pairs (inclusive)")
+    bounds <- do.call(rbind, ranges)
+    bounds <- bounds[order(bounds[, 1]), , drop = FALSE]
+    if (nrow(bounds) > 1L &&
+        any(bounds[-1L, 1] <= bounds[-nrow(bounds), 2]))
+        stop("tf_length_ranges must not overlap (bounds are inclusive)")
+    invisible(NULL)
+}
+
 .read_tracks <- function(samples, reads, region, parameters) {
     kinds <- intersect(c("nucleosome", "tf", "fire"), names(samples))
     kinds <- kinds[vapply(kinds, function(k)
@@ -66,9 +82,16 @@
             b <- b[b$block_score >= p$min_tf_score, , drop = FALSE]
         }
         size <- b$end - b$start
-        b$class <- ifelse(size >= 10 & size < 30, "size10-30",
-            ifelse(size >= 40 & size < 60, "size40-60",
-                ifelse(size >= 60 & size < 80, "size60-80", NA_character_)))
+        b$class <- rep(if (is.null(p$tf_length_ranges)) "TF (all lengths)"
+            else NA_character_, nrow(b))
+        for (r in p$tf_length_ranges) {
+            # Preserve historical class names for the three original ranges.
+            label <- if (identical(as.numeric(r), c(10, 29))) "size10-30"
+                else if (identical(as.numeric(r), c(40, 59))) "size40-60"
+                else if (identical(as.numeric(r), c(60, 79))) "size60-80"
+                else paste0("TF ", r[1], "-", r[2], " bp")
+            b$class[size >= r[1] & size <= r[2]] <- label
+        }
         b <- b[!is.na(b$class), , drop = FALSE]
     }
     if (!nrow(b)) return(empty)

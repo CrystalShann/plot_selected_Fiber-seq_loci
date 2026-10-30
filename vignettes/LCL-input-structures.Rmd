@@ -1,11 +1,11 @@
 ---
-title: "LCL input structures and function guide"
+title: "Overview of the functions"
 author: "Crystal Shan"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{LCL input structures and function guide}
+  %\VignetteIndexEntry{Overview of the functions}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -28,18 +28,18 @@ All analysis runs in R. The package expects processed tracks rather than BAM
 or FASTQ files. See **Select Fiber-seq loci: ALAS1 with and without clustering**
 for the full set of clustered and unclustered panels.
 
-| Function | Accepted input | Output / next step |
-|:--|:--|:--|
-| `example_data()` | New or empty writable directory | A list containing `samples`, `regions` and `directory` |
-| `make_sample_sheet()` | `data.frame`, `DataFrame`, or a headered TSV path | Sample `DataFrame` for validation and analysis |
-| `prepare_regions()` | `GRanges`, coordinate table/string, headerless BED, or GTF/GFF3 | Named `GRanges` for validation and analysis |
-| `extract_canonical_tss()` | GTF/GFF3 with a specified canonical attribute | Optional alternative source of region `GRanges` |
-| `validate_inputs()` | Sample sheet plus region `GRanges` | Invisible `TRUE`, or an informative error |
-| `analyze_loci()` | Samples, regions and explicit clustering choice | Named `SimpleList` of `RangedSummarizedExperiment` objects |
-| `locus_profile()` | One locus experiment | `DataFrame` of pooled or cluster-wise fractions |
-| `plot_locus()` | One locus experiment, panel type and view | `ComplexHeatmap::Heatmap`, ggplot or patchwork composition |
-| `cluster_colors()` | Cluster labels or factor levels | Original cluster colors, shared by all plots |
-| `write_locus_results()` | One experiment or the whole results list | RDS, TSV and PDF files in a new or empty directory |
+| Function | Accepted input |
+| :-- | :-- |
+| `example_data()` | New or empty writable directory |
+| `make_sample_sheet()` | `data.frame`, `DataFrame`, or a headered TSV path |
+| `prepare_regions()` | `GRanges`, coordinate table/string, headerless BED, or GTF/GFF3 |
+| `extract_canonical_tss()` | GTF/GFF3 with a specified canonical attribute |
+| `validate_inputs()` | Sample sheet plus region `GRanges` |
+| `analyze_loci()` | Samples, regions and explicit clustering choice |
+| `locus_profile()` | One locus experiment |
+| `plot_locus()` | One locus experiment, panel type and view |
+| `cluster_colors()` | Cluster labels or factor levels |
+| `write_locus_results()` | One experiment or the whole results list |
 
 ## 1. Copy the example into a writable directory
 
@@ -73,14 +73,14 @@ knitr::kable(sample_table[1, c("m6a_format", "nucleosome_format",
     "tf_format", "fire_format")], row.names = FALSE)
 ```
 
-| Column(s) | Required? | Meaning |
-|:--|:--|:--|
-| `sample_name` | Yes | Unique read namespace and sample key; use letters, digits, `_`, `.` or `-` |
-| `sample_label` | No | Display label; defaults to `sample_name` |
-| `m6a`, `m6a_format` | Yes | Path/template and explicit modification-track format |
-| `nucleosome`, `nucleosome_format` | No | Path/template and format for a supplied nucleosome track |
-| `tf`, `tf_format` | No | Path/template and format for supplied TF footprints |
-| `fire`, `fire_format` | No | Path/template and format for a supplied FIRE track |
+| Column(s) | Required? |
+| :-- | :-- |
+| `sample_name` | Yes |
+| `sample_label` | No |
+| `m6a`, `m6a_format` | Yes |
+| `nucleosome`, `nucleosome_format` | No |
+| `tf`, `tf_format` | No |
+| `fire`, `fire_format` | No |
 
 `make_sample_sheet()` normalizes this table to an `S4Vectors::DataFrame`.
 For an in-memory table, `base_dir` resolves relative paths. For a TSV filename,
@@ -138,14 +138,14 @@ The ALAS1 interval `[52197159, 52199159)` becomes
 minus strand, but its genomic start is still less than its end. Coordinates
 are not reversed for minus-strand loci.
 
-| Input to `prepare_regions()` | Coordinate convention | Details |
-|:--|:--|:--|
-| `GRanges` | One-based inclusive | Preserves sequence information; names identify regions |
-| `data.frame` / `DataFrame` | Explicit `"bed"` or `"one_based"` | Required `chr`, `start`, `end`; optional `region_id`, `strand`, `tss` |
-| Headerless BED path | Zero-based, half-open | First three fields are contig/start/end; field 4 is region ID and field 6 is strand |
-| `"chr3:52197160-52199159"` | One-based inclusive | Plain coordinate string; no TSS or gene metadata inferred |
-| `annotation = "file.gtf"` or `"file.gff3"` | One-based annotation coordinates | Transcript features define TSSs; see annotation examples below |
-| Custom single-base TSS BED | Zero-based, half-open | Optional `bed_annotation = "gencode_custom"`; name field is `geneID;annotation;geneName` |
+| Input to `prepare_regions()` | Coordinate convention |
+| :-- | :-- |
+| `GRanges` | One-based inclusive |
+| `data.frame` / `DataFrame` | Explicit `"bed"` or `"one_based"` |
+| Headerless BED path | Zero-based, half-open |
+| `"chr3:52197160-52199159"` | One-based inclusive |
+| `annotation = "file.gtf"` or `"file.gff3"` | One-based annotation coordinates |
+| Custom single-base TSS BED | Zero-based, half-open |
 
 Do not pass a headered `regions.tsv` directly as a BED filename. `flank_bp`
 expands annotation-derived TSSs or custom TSS BEDs; ordinary coordinate inputs
@@ -191,7 +191,7 @@ from whether the user ran fibertools or FiberHMM. These are the supported
 formats; the LCL subset uses the four marked in the final column.
 
 | Track | Format string | Fields | Present in this LCL subset? |
-|:--|:--|:--|:--|
+| :-- | :-- | :-- | :-- |
 | m6A | `bed12_fibertools` | BED12 blocks, including terminal sentinel blocks | Yes |
 | Nucleosome | `bed12_fibertools` | BED12 blocks, including terminal sentinel blocks | Yes |
 | Nucleosome | `bed13_fiberhmm` | BED12 plus per-block scores; no sentinel removal | No; supported alternative |
@@ -240,10 +240,15 @@ calls in the selected region still contribute to the denominator if they
 span the region.
 
 For the actual TF BED15, field 13 contains scores for individual blocks.
-`min_tf_score = 50` filters those scores, not field 5. Retained TF width
+`min_tf_score = 50` filters those scores, not field 5. Default TF width
 classes are [10,30), [40,60) and [60,80) bp. BED6 TF intervals are expected to
 be score-filtered already; the same width classes apply. The default retained
 nucleosome widths are 130 through 160 bp inclusive.
+
+TF length classes can be changed with `analyze_loci(tf_length_ranges =
+list(c(30, 39), c(80, 120)), ...)`, using inclusive bounds. Use
+`tf_length_ranges = NULL` to retain all positive lengths. This applies to
+both FiberHMM BED15 and custom BED6 TF inputs.
 
 FIRE records are per-read intervals, joined by their original RID. The trailing
 tag may contain legacy haplotype labels in these source files; the package
@@ -317,7 +322,7 @@ alignment start, then RID.
 at that genomic position, not an experimentally measured unmethylated adenine.
 
 | Component | Structure | Alignment with the assay |
-|:--|:--|:--|
+| :-- | :-- | :-- |
 | `rowRanges(x)` | Single-base `GRanges`, one-based inclusive | One range and matching row name per assay row |
 | `colData(x)` | `DataFrame` of read metadata | One row and matching RID per assay column |
 | `colData(x)$read_range` | `GRanges` of full alignments | One alignment per assay column; agrees with `chr`, `start`, `end`, `strand` |
@@ -525,7 +530,7 @@ stopifnot(identical(assay(restored), assay(x)),
 ```
 
 | File or directory within each locus | Contents |
-|:--|:--|
+| :-- | :-- |
 | `locus.rds` | Complete experiment, including range columns and parameters |
 | `m6a_matrix.rds` | Sparse assay only |
 | `reads.tsv` | Flattened read metadata; `read_range` and `footprints` remain in the RDS |
