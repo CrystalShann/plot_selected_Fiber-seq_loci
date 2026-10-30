@@ -1,13 +1,5 @@
 # selectFiberseqLociWorkflow
-
-A native R/Bioconductor package for selecting Fiber-seq loci, building sparse
-single-molecule modification assays, displaying footprint tracks and optionally
-running Manhattan/Leiden clustering. All analysis runs directly in R.
-
-The GitHub destination is
-[CrystalShann/plot_selected_Fiber-seq_loci](https://github.com/CrystalShann/plot_selected_Fiber-seq_loci).
-The R package name remains `selectFiberseqLociWorkflow`. The existing
-`CrystalShann/fiber-seq-analysis` repository is a separate analysis project.
+This is to plot m6a heatmap for a selected locus and have the option to do clustering on methylation signal
 
 ## Install
 
@@ -32,11 +24,6 @@ install.packages("selectFiberseqLociWorkflow_0.99.0.tar.gz",
     repos = NULL, type = "source")
 ```
 
-This is a development version prepared for local Bioconductor checks. It is
-not yet a published Bioconductor package; `BiocManager::install()` cannot
-retrieve it by package name. The runtime needs neither Snakemake nor Conda.
-The input tracks must already be processed, bgzip-compressed and tabix-indexed.
-The package does not install software or run read callers.
 
 ## Quick start
 
