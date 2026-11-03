@@ -434,7 +434,7 @@ results/ALAS1/
 
 ## Further tutorials
 
-Two executable vignettes cover all ten public functions:
+Two executable vignettes cover the locus workflow:
 
 - [Function reference and tutorials](vignettes/function-reference.Rmd):
   a package overview, functions grouped by task, and runnable examples for every
@@ -463,3 +463,56 @@ rmarkdown::render("vignettes/function-reference.Rmd")
 rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
 ```
 
+
+## Optional native R autocorrelation
+
+Use the **same sample sheet and regions** as clustering. The two switches are
+independent: either analysis, both, or neither can be enabled. Existing calls
+continue to default to `autocorrelation = FALSE`.
+
+```r
+results <- analyze_loci(samples, regions,
+    clustering = TRUE, autocorrelation = TRUE,
+    autocorrelation_options = list(max_lag = 500))
+x <- results[[1]]
+a <- S4Vectors::metadata(x)$autocorrelation
+S4Vectors::metadata(x)$autocorrelation_status
+autocorrelation_profile(a, group_by = "sample")
+plot_autocorrelation(a, group_by = "sample")
+ComplexHeatmap::draw(plot_autocorrelation(a, "heatmap"))
+write_locus_results(results, "results_with_acf")
+```
+
+Choose `max_lag` smaller than every locus width, or omit it to use each locus's
+full lag range. ACF uses all consecutive bases and the same full-span reads;
+Manhattan bin width and profile smoothing do not affect it. Constant reads
+remain present with undefined ACFs and are excluded from means. Positive local
+repeat peaks at 140–250 bp are reported when at least 252 lag features exist.
+
+To additionally cluster **ACF profiles**, install the optional R packages and
+use separate ACF settings:
+
+```r
+install.packages(c("uwot", "irlba"))
+results <- analyze_loci(samples, regions,
+    clustering = FALSE, autocorrelation = TRUE,
+    autocorrelation_options = list(clustering = TRUE,
+        n_pcs = 50, n_neighbors = 10, resolution = 0.4, seed = 0))
+a <- S4Vectors::metadata(results[[1]])$autocorrelation
+plot_autocorrelation(a, group_by = "acf_cluster")
+```
+
+ACF clustering follows the updated R PCA/correlation-neighbor/fuzzy-graph/Leiden
+implementation. Its labels (`acf_cluster`), statuses, UMAP coordinates and graph
+are separate from Manhattan `cluster` labels. `group_by = "cluster"` uses the
+original Manhattan labels; `"acf_cluster"` uses ACF labels. ACF preserves the
+caller's random-number state. An ACF failure records a warning/status and keeps
+the locus and Manhattan result available.
+
+For an already analyzed locus, use `a <- locus_autocorrelation(x)` without
+rereading inputs. `write_autocorrelation_results(a, "acf_only")` exports it alone;
+`write_locus_results()` exports attached ACF results under each locus's
+`autocorrelation/` directory. Saved metadata describe the original run; after
+subsetting a locus, recompute ACF on the subset rather than using its old metadata.
+This package uses the native R numerical methods without the LCL-specific
+phasing and allele-reporting requirements.

@@ -10,3 +10,8 @@ export(example_data)
 importFrom(stats, dist, setNames)
 importFrom(utils, read.table)
 export(cluster_colors)
+
+export(locus_autocorrelation)
+export(autocorrelation_profile)
+export(plot_autocorrelation)
+export(write_autocorrelation_results)

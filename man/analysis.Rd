@@ -7,9 +7,17 @@ optionally cluster them using Manhattan distances and Leiden communities.}
 analyze_loci(samples, regions, clustering, window_size = 0,
     k_neighbors = 10, resolution = 1, seed = 1, nuc_min = 130,
     nuc_max = 160, min_tf_score = 50, smoothing_bp = 10,
-    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79)))
+    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79)),
+    autocorrelation = FALSE, autocorrelation_options = list())
 }
 \arguments{
+\item{autocorrelation}{Logical, default FALSE. Compute independent per-read
+ACFs using the same sample sheet and full-span reads. Works with either value
+of clustering.}
+\item{autocorrelation_options}{Named list of arguments to
+\code{\link{locus_autocorrelation}}, excluding x. For example,
+\code{list(max_lag = 500, clustering = TRUE, resolution = 0.4)}.
+These settings affect only ACF analysis.}
 \item{samples}{A sample DataFrame, data.frame or TSV path; see
 \code{\link{make_sample_sheet}}.}
 \item{regions}{A named GRanges, normally from \code{\link{prepare_regions}}.}
@@ -40,7 +48,11 @@ rownames and RID match assay columns. colData includes original_RID,
 sample_name, sample_label, one-based alignment start/end, a GRanges
 \code{read_range} column, and a GRangesList \code{footprints} column.
 Footprint metadata include RID, track and class. Successful clustering adds
-colData$cluster without changing assay or read order.}
+colData$cluster without changing assay or read order. Enabled autocorrelation
+adds an independent lag-by-read SummarizedExperiment in
+\code{metadata(x)$autocorrelation}, with a separate status in
+\code{metadata(x)$autocorrelation_status}. ACF errors produce a warning and
+status while preserving the locus and its Manhattan clustering results.}
 \details{Only the longest overlapping alignment per read is considered; it
 must span the entire locus. Reads with zero m6A calls remain in the assay and
 denominators. Fibertools sentinel blocks are removed; FiberHMM blocks are not.
@@ -51,7 +63,7 @@ selected region''. Empty loci return zero-column experiments.
 
 Normal SummarizedExperiment subsetting keeps rowRanges, assay, colData,
 alignment ranges and per-read footprints synchronized. Metadata contain the
-original region, sample sheet, QC, parameters and optional clustering fit as
+original region, sample sheet, QC, parameters, optional autocorrelation and clustering fit as
 run provenance; these summaries are not recalculated by generic subsetting.
 \code{locus_profile} recalculates denominators for the current columns.
 The clustering controls \code{window_size}, \code{k_neighbors} and

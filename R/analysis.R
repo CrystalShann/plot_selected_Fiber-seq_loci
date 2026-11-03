@@ -2,10 +2,14 @@
 analyze_loci <- function(samples, regions, clustering,
     window_size = 0, k_neighbors = 10, resolution = 1, seed = 1,
     nuc_min = 130, nuc_max = 160, min_tf_score = 50, smoothing_bp = 10,
-    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79))) {
+    tf_length_ranges = list(c(10, 29), c(40, 59), c(60, 79)),
+    autocorrelation = FALSE, autocorrelation_options = list()) {
     if (missing(clustering) || !is.logical(clustering) ||
         length(clustering) != 1L || is.na(clustering))
         stop("Choose clustering = TRUE or FALSE explicitly")
+    if (!is.logical(autocorrelation) || length(autocorrelation) != 1L || is.na(autocorrelation))
+        stop("autocorrelation must be TRUE or FALSE")
+    if (autocorrelation) .acf_validate_options(autocorrelation_options)
     values <- list(window_size, k_neighbors, resolution, seed, nuc_min,
         nuc_max, min_tf_score, smoothing_bp)
     
@@ -28,6 +32,8 @@ analyze_loci <- function(samples, regions, clustering,
     # Analyze each selected region independently
     ans <- lapply(seq_along(regions), function(i)
         .analyze_region(samples, regions[i], parameters))
+    if (autocorrelation) ans <- lapply(ans, .add_locus_autocorrelation,
+        options = autocorrelation_options)
     names(ans) <- names(regions)
     S4Vectors::SimpleList(ans)
 }

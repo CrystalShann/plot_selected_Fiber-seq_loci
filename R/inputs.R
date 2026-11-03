@@ -5,6 +5,7 @@
   p <- path.expand(p)
   if (grepl("^(/|[A-Za-z]:[/\\\\])", p)) return(p)
   file.path(normalizePath(base, mustWork = TRUE), p)
+}
 
 .expand_path <- function(p, sample, chr) {
   p <- gsub("{sample_name}", sample, p, fixed = TRUE)

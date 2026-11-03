@@ -27,6 +27,9 @@ write_locus_results <- function(results, directory) {
         .write_table(as.data.frame(cd[, flat, drop = FALSE]),
             file.path(out, "reads.tsv"))
         md <- S4Vectors::metadata(x)
+        if (!is.null(md$autocorrelation))
+            write_autocorrelation_results(md$autocorrelation,
+                file.path(out, "autocorrelation"))
         .write_table(as.data.frame(md$qc), file.path(out, "qc.tsv"))
         .write_table(.regions_table(md$region), file.path(out, "region.tsv"))
         .write_panels(x, file.path(out, "unclustered"), FALSE)

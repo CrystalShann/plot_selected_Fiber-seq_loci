@@ -1,7 +1,7 @@
 Package: selectFiberseqLociWorkflow
 Type: Package
 Title: Select and Analyze Single-Molecule Fiber-seq Loci
-Version: 0.99.0
+Version: 0.99.1
 Authors@R: person("Crystal", "Shan", role = c("aut", "cre"),
     email = "crystalshan2002@gmail.com")
 Description: Select genomic loci from coordinates or transcript annotations and
@@ -9,6 +9,7 @@ Description: Select genomic loci from coordinates or transcript annotations and
     Represent genomic positions with GRanges and sparse modification assays
     with RangedSummarizedExperiment, keeping read metadata and footprint ranges
     aligned in colData. Provide optional Manhattan-distance Leiden clustering,
+    independent native R autocorrelation with optional ACF clustering,
     accessibility profiles, locus visualizations, and a small reproducible
     example without requiring an external workflow engine.
 License: GPL-3
@@ -17,8 +18,8 @@ Depends: R (>= 4.4.0)
 Imports: BiocGenerics, GenomeInfoDb, GenomicRanges, IRanges, S4Vectors,
     SummarizedExperiment, rtracklayer, Rsamtools, Matrix, data.table, dplyr,
     igraph, withr, ggplot2, ComplexHeatmap, methods, stats, utils, grDevices,
-    grid, patchwork, cowplot
-Suggests: knitr, rmarkdown, BiocCheck
+    grid, patchwork, cowplot, circlize
+Suggests: knitr, rmarkdown, BiocCheck, uwot, irlba
 VignetteBuilder: knitr
 biocViews: Epigenetics, Sequencing, Clustering,
     DataImport, Visualization, Software
