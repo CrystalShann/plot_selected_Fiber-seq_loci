@@ -1,7 +1,9 @@
 # selectFiberseqLociWorkflow
 Analyze selected Fiber-seq loci, plot m6A and per-read footprint tracks, and
-optionally cluster reads by their m6A patterns using Manhattan-distance Leiden
-clustering.
+optionally run Manhattan-distance Leiden clustering and native R per-read
+autocorrelation (ACF). Both analyses use the same sample sheet and selected loci,
+with independent switches and settings. ACF profiles can also be clustered
+separately without changing the Manhattan clusters.
 
 ## Install
 
@@ -20,11 +22,19 @@ remotes::install_github("CrystalShann/plot_selected_Fiber-seq_loci")
 
 ```r
 install.packages(c("Matrix", "data.table", "dplyr", "igraph", "withr", "ggplot2",
-    "patchwork", "cowplot"))
-install.packages("selectFiberseqLociWorkflow_0.99.0.tar.gz",
+    "patchwork", "cowplot", "circlize"))
+install.packages("selectFiberseqLociWorkflow_0.99.1.tar.gz",
     repos = NULL, type = "source")
 ```
 
+
+For optional clustering of ACF profiles, also install:
+
+```r
+install.packages(c("uwot", "irlba"))
+```
+
+All analysis code is R; Python is not required.
 
 ## Step-by-step analysis
 
@@ -130,7 +140,8 @@ samples
 The returned object is an `S4Vectors::DataFrame`. The TSV is written in the
 current working directory (`getwd()`). For relative paths in an in-memory
 sample table, supply `base_dir = "/path/to/base"`; the default is `getwd()`.
-File and contig checks are performed in step 5.
+File and contig checks are performed in step 5. Leiden clustering and
+autocorrelation share this sample sheet; no separate ACF input sheet is needed.
 
 ### 4. Prepare custom regions
 
@@ -214,9 +225,19 @@ tracks may legitimately have no calls on a selected contig.
 ### 6. Specify analysis parameters
 
 Define settings once so both runs use the same footprint filters and profile
-smoothing. These example values are the package defaults:
+smoothing. This example enables both Manhattan Leiden and ACF in step 8. Set
+either switch to `FALSE` to omit that analysis; `clustering` must be chosen
+explicitly, while `autocorrelation` defaults to `FALSE` in the API. The other
+values below are the package defaults:
 
 ```r
+clustering <- TRUE
+autocorrelation <- TRUE
+autocorrelation_options <- list(
+    max_lag = NULL,       # all lags, from 0 to locus width minus one
+    clustering = FALSE,  # optional clustering of ACF profiles only
+    n_pcs = 50, n_neighbors = 10, resolution = 0.4, seed = 0
+)
 window_size <- 0
 k_neighbors <- 10
 resolution <- 1
@@ -230,7 +251,13 @@ smoothing_bp <- 10
 
 | Parameter | Meaning |
 | --- | --- |
-| `clustering` | Required `FALSE` or `TRUE`, chosen separately in steps 7 and 8. Clustering uses m6A patterns, not footprint tracks. |
+| `clustering` | Required `FALSE` or `TRUE` for Manhattan-distance Leiden on m6A patterns. Independent of ACF and footprint tracks. |
+| `autocorrelation` | `TRUE` to compute ACF on the same full-span reads; `FALSE` to omit it. Works with either value of `clustering`. |
+| `autocorrelation_options` | Named list of ACF settings below; affects only ACF analysis. |
+| `autocorrelation_options$max_lag` | Largest lag in bp. `NULL` uses each locus's full lag range; an explicit integer must be smaller than every analyzed locus width. ACF requires at least two bases. |
+| `autocorrelation_options$clustering` | Whether to cluster ACF profiles independently; default `FALSE`. Requires `uwot`, `irlba`, and at least three lag features. |
+| `autocorrelation_options$n_pcs`, `$n_neighbors` | Requested PCA components and correlation-distance neighbors for ACF clustering, both integers >= 2; defaults 50 and 10. |
+| `autocorrelation_options$resolution`, `$seed` | Positive ACF Leiden resolution and nonnegative integer seed; defaults 0.4 and 0. Independent of the top-level Manhattan settings. |
 | `window_size` | Clustering bin width in bp. `0` uses individual observed m6A sites; a positive integer, such as `50`, averages each read's calls over observed sites in each occupied bin. Bins start at the locus's first base. |
 | `k_neighbors` | Positive integer number of Manhattan nearest neighbors per read; capped at retained reads minus one. |
 | `resolution` | Nonnegative Leiden resolution; larger values generally favor finer partitions. |
@@ -246,12 +273,19 @@ binned run, set `window_size <- 50`, `k_neighbors <- 5`, and
 `resolution <- 0.5` before running step 8. These values are not optimized for a
 particular species or experiment.
 
-### 7. Get m6A and footprint results without clustering
+ACF uses every consecutive genomic base, independently of Manhattan binning
+and profile smoothing. Constant reads retain undefined (`NA`) ACFs and are
+excluded from ACF means; SD and SEM require at least two valid reads. Positive
+local repeat peaks at 140–250 bp are reported only when `max_lag >= 251`.
+To enable independent ACF clustering, set
+`autocorrelation_options$clustering <- TRUE` before step 8.
+
+### 7. Get baseline m6A and footprint results
 
 ```r
 unclustered_results <- analyze_loci(
     samples, regions,
-    clustering = FALSE,
+    clustering = FALSE, autocorrelation = FALSE,
     nuc_min = nuc_min, nuc_max = nuc_max,
     min_tf_score = min_tf_score, smoothing_bp = smoothing_bp,
     tf_length_ranges = tf_length_ranges
@@ -278,12 +312,13 @@ The objects above supply the m6A heatmap, aggregate m6A profile and footprint
 panels plotted in step 9. `frac` in the profile is the observed-call fraction;
 `smooth_frac` is its smoothed value.
 
-### 8. Get clustering results
+### 8. Run optional Leiden clustering and autocorrelation
 
 ```r
-clustered_results <- analyze_loci(
+analysis_results <- analyze_loci(
     samples, regions,
-    clustering = TRUE,
+    clustering = clustering, autocorrelation = autocorrelation,
+    autocorrelation_options = autocorrelation_options,
     window_size = window_size, k_neighbors = k_neighbors,
     resolution = resolution, seed = seed,
     nuc_min = nuc_min, nuc_max = nuc_max,
@@ -291,7 +326,7 @@ clustered_results <- analyze_loci(
     tf_length_ranges = tf_length_ranges
 )
 
-xc <- clustered_results[[locus_id]]
+xc <- analysis_results[[locus_id]]
 clustering_status <- S4Vectors::metadata(xc)$clustering_status
 clustering_status
 
@@ -302,9 +337,19 @@ if (identical(clustering_status, "complete")) {
                 cluster = colData(xc)$cluster))
     cluster_m6a <- locus_profile(xc, by_cluster = TRUE)
 }
+
+acf_status <- S4Vectors::metadata(xc)$autocorrelation_status
+acf_status
+if (identical(acf_status, "complete")) {
+    a <- S4Vectors::metadata(xc)$autocorrelation
+    acf_matrix <- assay(a, "acf")  # lags x reads, separate from the m6a assay
+    acf_summary <- autocorrelation_profile(a, group_by = "sample")
+    head(acf_summary)
+}
 ```
 
-Reads from the supplied samples are clustered together within each locus using
+When Manhattan clustering is enabled, reads from the supplied samples are
+clustered together within each locus using
 Manhattan distances, a nearest-neighbor graph and Leiden communities. At least
 three reads and two occupied features are required; otherwise, metadata record
 why clustering was skipped. Exact pairwise distances use quadratic memory in
@@ -312,7 +357,19 @@ the number of reads.
 
 Clustering adds assignments without changing the assay or its column order.
 Settings and clustering provenance are saved in `S4Vectors::metadata(xc)`.
-To change a fit, rerun `analyze_loci()`; plot options do not rerun clustering.
+ACF results are stored separately in `S4Vectors::metadata(xc)$autocorrelation`.
+Optional ACF clustering uses centered PCA, correlation-distance neighbors, a
+`uwot` fuzzy graph and igraph Leiden; UMAP is for display. Its `acf_cluster`
+labels, statuses, UMAP coordinates and graph are independent of the original
+Manhattan `cluster` labels. ACF preserves the caller's random-number state.
+An ACF failure records a warning/status and keeps the locus and Manhattan fit.
+
+The four switch combinations enable neither analysis, Manhattan only, ACF only,
+or both. `analysis_results` contains whichever analyses you enabled.
+For an existing locus, `a <- locus_autocorrelation(xc)` computes
+ACF without rereading inputs. To change a fit, rerun the analysis; plot options
+do not refit it. Saved metadata describe the original run, so recompute ACF on
+a subset with `locus_autocorrelation(x_subset)` instead of using its old metadata.
 
 ### 9. Plot all figures
 
@@ -334,7 +391,26 @@ if (identical(clustering_status, "complete")) {
 }
 ```
 
-The heatmap displays reads vertically and genomic positions horizontally.
+Draw ACF curves and heatmaps when autocorrelation completed:
+
+```r
+if (identical(acf_status, "complete")) {
+    print(plot_autocorrelation(a, group_by = "sample"))
+    ComplexHeatmap::draw(plot_autocorrelation(a, "heatmap", group_by = "sample"))
+    if ("cluster" %in% names(colData(a)))
+        print(plot_autocorrelation(a, group_by = "cluster"))
+    if ("acf_cluster" %in% names(colData(a)))
+        print(plot_autocorrelation(a, group_by = "acf_cluster"))
+}
+```
+
+For ACF, `group_by = "cluster"` uses the original Manhattan labels and
+`"acf_cluster"` uses the independent ACF labels. Unassigned ACF reads remain
+in all/sample views and exports, but are excluded from ACF-cluster views.
+Plots omit lag zero by default; use `lag_range = c(0, 500)` to include it when
+those lags are available. ACF heatmaps display lag in bp on the horizontal axis.
+
+The m6A heatmap displays reads vertically and genomic positions horizontally.
 The footprint figure stacks the aggregate m6A profile, m6A read tracks and
 available FIRE/nucleosome/TF tracks. Sample annotations appear farthest left,
 followed by cluster in clustered views. TSS markers appear when TSS metadata
@@ -380,26 +456,30 @@ Choose new or empty output directories:
 output_dir <- "fiberseq_results"
 
 write_locus_results(
-    unclustered_results, file.path(output_dir, "without_clustering")
+    unclustered_results, file.path(output_dir, "baseline")
 )
 write_locus_results(
-    clustered_results, file.path(output_dir, "with_clustering")
+    analysis_results, file.path(output_dir, "selected_analyses")
 )
 ```
 
 Each locus gets its own directory with complete RDS objects, TSV summaries and
-PDF figures. The clustered run exports both unclustered views and, when
-clustering succeeds, clustered views plus assignments and graph edges.
+PDF figures. Enabled analyses are exported together: successful Manhattan
+clustering adds clustered views, assignments and graph edges; successful ACF
+adds an `autocorrelation/` subdirectory with its experiment, summaries and plots.
+ACF clustering, when requested, adds separate labels and graph edges there.
+To export an ACF experiment alone, use
+`write_autocorrelation_results(a, "acf_only")` with a new or empty directory.
 `locus.rds` preserves the assay, read metadata, per-read footprints and analysis
 provenance. See the output layout below.
 
 ```r
 list.files(output_dir, recursive = TRUE)
 
-# Reload a locus from the clustered run. Use its exported directory name
+# Reload a locus with the selected analyses. Use its exported directory name
 # (unsafe filename characters in locus names are replaced by underscores).
 exported_locus <- list.files(
-    file.path(output_dir, "with_clustering"),
+    file.path(output_dir, "selected_analyses"),
     pattern = "^locus[.]rds$", recursive = TRUE, full.names = TRUE
 )[1]
 restored <- readRDS(exported_locus)
@@ -430,6 +510,18 @@ results/ALAS1/
     manifest.tsv
     assignments.tsv
     edges.tsv
+  autocorrelation/             # only after successful ACF computation
+    autocorrelation.rds        # lags x reads experiment and ACF provenance
+    reads.tsv                  # validity, peaks and optional ACF cluster labels
+    lags.tsv
+    acf_profile_all.tsv         # means, SD, SEM and valid/invalid counts
+    acf_profile_sample.tsv
+    acf_profile_all.pdf
+    acf_heatmap_all.pdf
+    acf_profile_sample.pdf
+    acf_heatmap_sample.pdf
+    acf_edges.tsv              # when ACF clustering was requested
+    # Additional *_cluster.* and *_acf_cluster.* views when labels exist
 ```
 
 ## Further tutorials
@@ -437,17 +529,24 @@ results/ALAS1/
 Two executable vignettes cover the locus workflow:
 
 - [Function reference and tutorials](vignettes/function-reference.Rmd):
-  a package overview, functions grouped by task, and runnable examples for every
-  public function.
+  a package overview, functions grouped by task, and runnable locus examples.
 - [ALAS1 with and without clustering](vignettes/ALAS1-clustered-and-unclustered.Rmd):
   all three plot types in both modes, adjustable clustering and result export.
 
 The additional [LCL fiber-seq data example](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.html)
-uses all 31 LCL samples from the at ALAS1 promoter region, with unclustered and
+uses all 31 LCL samples at the ALAS1 promoter region, with unclustered and
 optional clustered panels. [R Markdown source](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/LCL-fiber-seq-data-example.Rmd)
 
 
-After installing a built release, open them with:
+The [Leiden and autocorrelation tutorial](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/autocorrelation-tutorial.html)
+walks through both independent analyses, ACF clustering, plots and exports with
+a [downloadable actual LCL subset with regional VCFs](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/lcl-autocorrelation-example.zip)
+and an optional full-cohort rs12470189 LCL analysis.
+[Download its R Markdown source](https://crystalshann.github.io/plot_selected_Fiber-seq_loci/autocorrelation-tutorial.Rmd).
+The real example preserves the project's phased-read selection; the general
+package workflow above does not require LCL-specific phasing or allele reports.
+
+After installing a built release, open the two bundled vignettes with:
 
 ```r
 vignette("function-reference", package = "selectFiberseqLociWorkflow")
@@ -462,57 +561,3 @@ To knit local HTML previews from the package root after installing the package:
 rmarkdown::render("vignettes/function-reference.Rmd")
 rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
 ```
-
-
-## Optional R autocorrelation
-
-Use the **same sample sheet and regions** as clustering. The two switches are
-independent: either analysis, both, or neither can be enabled. Existing calls
-continue to default to `autocorrelation = FALSE`.
-
-```r
-results <- analyze_loci(samples, regions,
-    clustering = TRUE, autocorrelation = TRUE,
-    autocorrelation_options = list(max_lag = 500))
-x <- results[[1]]
-a <- S4Vectors::metadata(x)$autocorrelation
-S4Vectors::metadata(x)$autocorrelation_status
-autocorrelation_profile(a, group_by = "sample")
-plot_autocorrelation(a, group_by = "sample")
-ComplexHeatmap::draw(plot_autocorrelation(a, "heatmap"))
-write_locus_results(results, "results_with_acf")
-```
-
-Choose `max_lag` smaller than every locus width, or omit it to use each locus's
-full lag range. ACF uses all consecutive bases and the same full-span reads;
-Manhattan bin width and profile smoothing do not affect it. Constant reads
-remain present with undefined ACFs and are excluded from means. Positive local
-repeat peaks at 140–250 bp are reported when at least 252 lag features exist.
-
-To additionally cluster **ACF profiles**, install the optional R packages and
-use separate ACF settings:
-
-```r
-install.packages(c("uwot", "irlba"))
-results <- analyze_loci(samples, regions,
-    clustering = FALSE, autocorrelation = TRUE,
-    autocorrelation_options = list(clustering = TRUE,
-        n_pcs = 50, n_neighbors = 10, resolution = 0.4, seed = 0))
-a <- S4Vectors::metadata(results[[1]])$autocorrelation
-plot_autocorrelation(a, group_by = "acf_cluster")
-```
-
-ACF clustering follows the updated R PCA/correlation-neighbor/fuzzy-graph/Leiden
-implementation. Its labels (`acf_cluster`), statuses, UMAP coordinates and graph
-are separate from Manhattan `cluster` labels. `group_by = "cluster"` uses the
-original Manhattan labels; `"acf_cluster"` uses ACF labels. ACF preserves the
-caller's random-number state. An ACF failure records a warning/status and keeps
-the locus and Manhattan result available.
-
-For an already analyzed locus, use `a <- locus_autocorrelation(x)` without
-rereading inputs. `write_autocorrelation_results(a, "acf_only")` exports it alone;
-`write_locus_results()` exports attached ACF results under each locus's
-`autocorrelation/` directory. Saved metadata describe the original run; after
-subsetting a locus, recompute ACF on the subset rather than using its old metadata.
-This package uses the native R numerical methods without the LCL-specific
-phasing and allele-reporting requirements.
