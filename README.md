@@ -464,7 +464,7 @@ rmarkdown::render("vignettes/ALAS1-clustered-and-unclustered.Rmd")
 ```
 
 
-## Optional native R autocorrelation
+## Optional R autocorrelation
 
 Use the **same sample sheet and regions** as clustering. The two switches are
 independent: either analysis, both, or neither can be enabled. Existing calls
