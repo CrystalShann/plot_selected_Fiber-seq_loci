@@ -10,7 +10,7 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 params:
-  synthetic_zip: "synthetic-autocorrelation.zip"
+  example_zip: "lcl-autocorrelation-example.zip"
   run_lcl: false
   project: "/project/spott/cshan/fiber-seq"
   lcl_run: "LCL_project/auto_correlation/resolution04"
@@ -74,42 +74,55 @@ stopifnot(requireNamespace("uwot", quietly = TRUE),
           requireNamespace("irlba", quietly = TRUE))
 ```
 
-### Download the synthetic test
+### Download the LCL subset and VCFs
 
 Download these two files into the same directory:
 
 - [R Markdown tutorial](autocorrelation-tutorial.Rmd)
-- [Synthetic test dataset (ZIP)](synthetic-autocorrelation.zip)
+- [Actual LCL example data, including VCFs (ZIP)](lcl-autocorrelation-example.zip)
 
-The ZIP contains two bgzip/tabix BED12 m6A tracks, their indexes, a relative-path
-sample sheet, a region table, ground-truth labels, checksums, and the complete
-R generator. This is **entirely synthetic**, freely reusable data (CC0-1.0), not
-an extract of the LCL samples. It contains 50 reads over a 2,000-bp artificial
-locus: 24 with planted 180-bp spacing, 24 with planted 220-bp spacing, and two
-zero-call controls. Both libraries contain both periodicities. This simplified
-model demonstrates ACF behavior; it is not a biological nucleosome simulation.
-The package's existing `example_data()` contains real LCL tracks, so it is not
-used as the synthetic test here.
+The example contains **33 actual reads** from two libraries at rs12470189:
+**AL16 / NA18508 (15 reads)** and **AL30 / NA18510 (18 reads)**. It includes
+all reads retained for these libraries in the saved native R ACF input, with
+no selection by peak strength, allele, ACF profile, or clustering result.
+The analysis interval is **chr2:119290056–119292055** (one-based inclusive).
+The variants and m6A calls are extracted from your existing processed files.
 
-Knit with the default `run_lcl: false` anywhere the package is installed. The
-real example needs access to the project's saved LCL input and report files:
+| Included file | Purpose |
+|:--|:--|
+| Two `*.m6a.bed.gz` files and `.tbi` indexes | Original full-span BED12 alignment records, copied without changing calls or coordinates. |
+| Two `*.region.vcf.gz` files and `.tbi` indexes | Variants within the analysis window, retaining only the matching cell-line genotype column in each VCF. |
+| `samples.tsv`, `regions.tsv` | Portable sample sheet and locus coordinates. |
+| `read_phasing.tsv` | Existing per-molecule HP, phase set, focal genotype and allele label. |
+| `reference.rds` | Corresponding saved binary inputs and native R per-read ACFs for verification. |
+| `provenance.tsv`, `source_checksums.tsv`, `checksums.tsv` | Source files, subset details, and checksum records. |
+| `prepare-lcl-subset.R` | R extraction script for rebuilding the download from the original project. |
+
+The VCF's fixed fields, FORMAT and selected GT/PS values are preserved.
+Its INFO annotations, including allele frequency, describe the original source
+cohort and are not recomputed for this subset. Full BED alignment boundaries
+are retained; only calls within the selected 2,000-bp locus enter the analysis.
+
+The default tutorial runs entirely from the ZIP and installed R packages; it
+does not require access to the original project directories. A later optional
+section repeats the analysis using the full 255-read saved LCL input.
 
 ```{r render-examples, eval=FALSE}
-# Synthetic example only: no LCL files required.
+# Downloadable LCL subset, including regional VCFs.
 rmarkdown::render("autocorrelation-tutorial.Rmd")
 
-# Include the real LCL analysis on the project filesystem.
+# Also include the full saved LCL cohort on the project filesystem.
 rmarkdown::render("autocorrelation-tutorial.Rmd",
     params = list(run_lcl = TRUE, project = "/project/spott/cshan/fiber-seq"))
 ```
 
-`synthetic_zip` can point to a ZIP elsewhere. Set `output_dir` to a new or empty
-folder to retain exports; the default uses a temporary directory. To select
-another existing LCL run, edit `lcl_run` and `lcl_region` in the YAML header.
-The values used to produce this page are recorded here:
+`example_zip` can point to the ZIP elsewhere. Set `output_dir` to a new or empty
+folder to retain exports; the default uses a temporary directory. `run_lcl`
+controls only the optional full-cohort section. The default downloadable
+example always uses actual LCL data. The values used for this render are:
 
 ```{r settings}
-knitr::kable(data.frame(setting = c("package_version", "run_lcl", "lcl_region"),
+knitr::kable(data.frame(setting = c("package_version", "run_full_lcl", "lcl_region"),
     value = c(as.character(packageVersion("selectFiberseqLociWorkflow")),
               params$run_lcl, params$lcl_region)))
 run_dir <- if (is.null(params$output_dir)) tempfile("acf-tutorial-results-") else
@@ -120,37 +133,88 @@ if (file.exists(run_dir) && (!dir.exists(run_dir) ||
 dir.create(run_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
-## Prepare the shared synthetic inputs
+## Prepare the shared LCL example inputs
 
 ### Unzip and verify the files
 
-The archive keeps paths relative to `samples.tsv`, so the download is portable.
-The code extracts to a new temporary directory each time it runs.
+Paths are relative to `samples.tsv`, so the download is portable. The code
+extracts into a new temporary directory on each run. The `vcf` and `vcf_sample`
+columns are additional metadata used explicitly below; the package's core
+m6A clustering and ACF methods do not require VCF input.
 
-```{r synthetic-inputs}
-stopifnot(file.exists(params$synthetic_zip))
-data_dir <- tempfile("acf-synthetic-input-")
+```{r example-inputs}
+stopifnot(file.exists(params$example_zip))
+data_dir <- tempfile("acf-lcl-input-")
 dir.create(data_dir)
-unzip(params$synthetic_zip, exdir = data_dir)
-data_dir <- file.path(data_dir, "synthetic-autocorrelation")
+unzip(params$example_zip, exdir = data_dir)
+data_dir <- file.path(data_dir, "lcl-autocorrelation-example")
 checksums <- read.delim(file.path(data_dir, "checksums.tsv"))
 stopifnot(identical(unname(tools::md5sum(file.path(data_dir, checksums$file))),
                     checksums$md5))
 samples <- make_sample_sheet(file.path(data_dir, "samples.tsv"))
-regions <- prepare_regions(read.delim(file.path(data_dir, "regions.tsv")),
-    coordinate_system = "bed")
+region_table <- read.delim(file.path(data_dir, "regions.tsv"))
+regions <- prepare_regions(region_table, coordinate_system = "bed")
 validate_inputs(samples, regions)
-knitr::kable(as.data.frame(samples)[, c("sample_name", "sample_label", "m6a_format")])
+phasing <- read.delim(file.path(data_dir, "read_phasing.tsv"), colClasses = "character")
+reference <- readRDS(file.path(data_dir, "reference.rds"))
+knitr::kable(as.data.frame(samples)[, c("sample_name", "sample_label", "vcf_sample", "m6a_format")])
 regions
 ```
 
-The synthetic BED interval `[1000, 3000)` becomes `chrSynthetic:1001-3000`
-in one-based inclusive coordinates. Every retained read spans the whole locus.
-Zero-call reads remain in the assay. No footprint tracks are supplied.
+BED coordinates `[119290055, 119292055)` correspond to the one-based interval
+above. The original LCL pipeline retained full-span reads with at least one
+m6A call and a phased focal heterozygous genotype (HP1/HP2, `0|1` or `1|0`).
+That selection has already been applied to the downloadable BED files. This
+subset is a worked example, not an unfiltered estimate of population coverage.
+
+### Inspect the included VCF and verify read phasing
+
+A VCF describes variant genotypes, not molecule-to-haplotype assignments.
+We therefore include the existing read-level phasing table as well. This code
+reads the focal SNP from each VCF, checks its cell-line column and phase set,
+and verifies the saved allele labels. It does not infer new read phasing.
+
+```{r vcf-check}
+read_focal_variant <- function(i) {
+    path <- file.path(data_dir, samples$vcf[i])
+    stopifnot(file.exists(path), file.exists(paste0(path, ".tbi")))
+    header <- Rsamtools::headerTabix(path)$header
+    columns <- strsplit(header[startsWith(header, "#CHROM\t")], "\t", fixed = TRUE)[[1]]
+    sample_column <- match(samples$vcf_sample[i], columns)
+    stopifnot(length(columns) == 10L, identical(sample_column, 10L))
+    query <- GRanges(region_table$chr,
+        IRanges::IRanges(region_table$focal_pos, width = 1L))
+    lines <- Rsamtools::scanTabix(path, param = query)[[1]]
+    fields <- strsplit(lines, "\t", fixed = TRUE)
+    hit <- fields[vapply(fields, function(f)
+        as.integer(f[2]) == region_table$focal_pos &&
+        f[4] == region_table$ref && f[5] == region_table$alt, logical(1))]
+    stopifnot(length(hit) == 1L)
+    f <- hit[[1]]
+    values <- setNames(strsplit(f[sample_column], ":", fixed = TRUE)[[1]],
+        strsplit(f[9], ":", fixed = TRUE)[[1]])
+    stopifnot(all(c("GT", "PS") %in% names(values)))
+    data.frame(sample_name = samples$sample_name[i], vcf_sample = samples$vcf_sample[i],
+        variant = f[3], ref = f[4], alt = f[5],
+        genotype = unname(values["GT"]), phase_set = unname(values["PS"]))
+}
+focal_variants <- do.call(rbind, lapply(seq_len(nrow(samples)), read_focal_variant))
+ix <- match(phasing$sample_name, focal_variants$sample_name)
+stopifnot(!anyNA(ix), all(phasing$focal_genotype == focal_variants$genotype[ix]),
+    all(phasing$phase_set == focal_variants$phase_set[ix]),
+    all(phasing$haplotype %in% c("HP1", "HP2")),
+    all(phasing$focal_genotype %in% c("0|1", "1|0")))
+is_alt <- (phasing$haplotype == "HP2" & phasing$focal_genotype == "0|1") |
+    (phasing$haplotype == "HP1" & phasing$focal_genotype == "1|0")
+allele <- ifelse(is_alt, focal_variants$alt[ix], focal_variants$ref[ix])
+stopifnot(all(phasing$allele_label == paste0(region_table$focal_snp, ": ", allele)))
+knitr::kable(focal_variants)
+knitr::kable(as.data.frame(table(sample = phasing$sample_name, haplotype = phasing$haplotype)))
+```
 
 ## Leiden clustering {#leiden}
 
-### Fit Manhattan-distance Leiden on the synthetic reads
+### Fit Manhattan-distance Leiden on the downloaded LCL reads
 
 This section uses only the existing m6A clustering path. The settings here
 are separate from the ACF settings in the next section.
@@ -160,6 +224,13 @@ leiden_results <- analyze_loci(samples, regions,
     clustering = TRUE, autocorrelation = FALSE,
     window_size = 0, k_neighbors = 10, resolution = 1, seed = 1)
 x_leiden <- leiden_results[[1]]
+# Carry the saved phasing annotations onto these exact molecules.
+read_keys <- paste(colData(x_leiden)$sample_name, colData(x_leiden)$original_RID, sep = "__")
+phasing_index <- match(read_keys, phasing$row_id)
+stopifnot(!anyNA(phasing_index), setequal(read_keys, phasing$row_id))
+for (field in c("haplotype", "phase_set", "focal_genotype", "allele_label", "allele_status"))
+    colData(x_leiden)[[field]] <- phasing[[field]][phasing_index]
+leiden_results[[1]] <- x_leiden
 metadata(x_leiden)$clustering_status
 knitr::kable(as.data.frame(table(sample = colData(x_leiden)$sample_label,
     cluster = colData(x_leiden)$cluster)))
@@ -174,9 +245,9 @@ plot_locus(x_leiden, "profile", clustered = TRUE)
 ```
 
 Manhattan clustering compares calls at corresponding genomic positions.
-Different periodicities and shifts can influence these clusters. The planted
-periods are not labels supplied to the fitting algorithm, and they do not
-require a particular number of Manhattan clusters.
+These labels describe the 33-read subset and need not reproduce the clusters
+from the full cohort. Neither VCF genotypes nor saved haplotype labels enter
+the Manhattan distance calculation.
 
 ## Autocorrelation {#autocorrelation}
 
@@ -205,13 +276,13 @@ All consecutive bases enter the calculation, including positions without calls.
 ```{r acf-summary}
 profile <- autocorrelation_profile(a, group_by = "sample")
 knitr::kable(as.data.frame(profile[profile$lag_bp %in% c(0, 180, 220), ]), digits = 4)
-stopifnot(sum(colData(a)$acf_valid) == 48L,
-          sum(!colData(a)$acf_valid) == 2L)
+stopifnot(ncol(a) == nrow(phasing), all(colData(a)$acf_valid))
 ```
 
 Means exclude constant reads; `n_reads`, `n_valid` and `n_invalid` make that
 exclusion visible. SD and SEM are `NA` with fewer than two valid reads.
-Both samples contain both periodicities, so their mean curves should be similar.
+The included reads all have nonconstant m6A profiles. Real samples need not
+have similar ACF curves or a peak in the 140–250-bp band.
 
 ### `plot_autocorrelation()` — curves and heatmap
 
@@ -253,33 +324,36 @@ statuses. Unassigned reads are excluded from `acf_cluster` views but remain in
 all/sample summaries and exports. Fewer than four valid reads cannot form an
 ACF clustering fit.
 
-### Check against the planted synthetic truth
+### Verify the extracted calls and ACFs against the original run
 
-Truth is joined **after** analysis, using sample and original read IDs.
-It does not affect the ACFs or either clustering model. The strongest positive
-local ACF peak in the 140–250-bp band should track the planted spacing.
+The archive includes the corresponding rows of the original binary input and
+saved native R ACFs. These are used only after extraction and analysis, to check
+that the original calls, read identities and numerical normalization agree.
+The package uses `sample::read` IDs while the saved pipeline uses
+`sample__read`; matching uses the original sample and read fields explicitly.
 
-```{r synthetic-checks}
-truth <- read.delim(file.path(data_dir, "truth.tsv"))
-cd <- as.data.frame(colData(acf_clustered))
-key <- function(sample, read) paste(sample, read, sep = "::")
-ix <- match(key(cd$sample_name, cd$original_RID), key(truth$sample_name, truth$original_RID))
-stopifnot(!anyNA(ix), identical(as.integer(Matrix::colSums(assay(x_leiden))),
-    as.integer(truth$n_calls[ix])))
-cd$truth <- truth$truth[ix]
-cd$period_bp <- truth$period_bp[ix]
-knitr::kable(as.data.frame(table(planted = cd$truth, acf_cluster = cd$acf_cluster)))
-peak_summary <- aggregate(positive_local_peak_140_250_bp ~ truth,
-    data = cd[!is.na(cd$period_bp), ], FUN = median)
-knitr::kable(peak_summary, digits = 1)
-stopifnot(all(abs(cd$positive_local_peak_140_250_bp[!is.na(cd$period_bp)] -
-    cd$period_bp[!is.na(cd$period_bp)]) <= 10))
+```{r reference-checks}
+reference_index <- match(read_keys, reference$row_ids)
+stopifnot(!anyNA(reference_index), length(read_keys) == length(reference$row_ids),
+    identical(unname(t(as.matrix(assay(x_leiden, "m6a")))),
+        unname(reference$binary[reference_index, , drop = FALSE])))
+expected_acf <- reference$acf[reference_index, seq_len(nrow(a)), drop = FALSE]
+observed_acf <- t(assay(a, "acf"))
+stopifnot(identical(unname(is.na(observed_acf)), unname(is.na(expected_acf))))
+max_difference_subset <- max(abs(observed_acf - expected_acf), na.rm = TRUE)
+stopifnot(max_difference_subset < 1e-12)
+knitr::kable(data.frame(check = c("Extracted reads", "Maximum absolute ACF difference"),
+    value = c(length(read_keys), max_difference_subset)))
+peak_data <- as.data.frame(colData(acf_clustered))
+knitr::kable(peak_data[, c("sample_name", "haplotype", "acf_cluster",
+    "positive_local_peak_140_250_bp", "peak_acf")], digits = 4)
 ```
 
-Peak detection requires the complete band and a neighboring lag beyond it:
-`max_lag >= 251`. A missing peak means no qualifying positive local maximum,
-not a repeat length of zero. Peak agreement is the synthetic numerical check;
-cluster identities can vary across dependency versions.
+Peak detection requires `max_lag >= 251`, so the complete 140–250-bp band and
+its neighboring lag are available. A missing peak means no qualifying positive
+local maximum. We do not assume a known repeat spacing for these biological
+reads. Subset clustering is refitted independently; cluster labels are not
+expected to equal the labels from the original full-cohort fit.
 
 ### Run either analysis, both, or neither from the same sample sheet
 
@@ -303,9 +377,9 @@ the locus and Manhattan fit. Check `autocorrelation_status` before using the
 attached result. ACF graphs and metadata describe the original run; recompute
 with `locus_autocorrelation(x_subset)` after subsetting a locus.
 
-## Real LCL example: rs12470189 {#lcl}
+## Optional full LCL cohort: rs12470189 {#lcl}
 
-This example uses the rank-1 locus in the native R workflow under
+This optional extension uses the full rank-1 locus in the native R workflow under
 `code/clustering_methods/auto_correlation`. The saved default analysis is
 **chr2:119290056–119292055**, a 2,000-bp window centered using the workflow's
 rule around rs12470189 at position 119291056. Its cached input contains **255
@@ -324,11 +398,11 @@ To demonstrate the exact current analysis, we reuse its read-only
 `m6a_input.rds` cache and the accompanying selection signature. We convert only
 the container orientation (reads × bases to bases × reads), preserve its read
 order and phasing metadata, and recompute ACF with the package. We do not rerun
-phasing or alter any saved LCL results. The real input files are not part of the
-synthetic download. If the cache is missing, run your native R pipeline first.
+phasing or alter any saved LCL results. The complete 15-library input is not part of the
+two-library download. If the cache is missing, run your native R pipeline first.
 
 ```{r lcl-note, results='asis', echo=FALSE}
-if (!params$run_lcl) cat("**LCL execution is disabled in this render.** Set `run_lcl: true` on a filesystem with the saved LCL inputs to execute the following chunks.\n")
+if (!params$run_lcl) cat("**Full-cohort LCL execution is disabled in this render.** Set `run_lcl: true` on a filesystem with the saved LCL inputs to execute the following chunks.\n")
 ```
 
 ### Load the existing run and create its sample sheet
@@ -444,18 +518,18 @@ plot_autocorrelation(lcl_acf, group_by = "sample", lag_range = c(1, 500))
 
 ## Export results
 
-### Save the synthetic analyses separately
+### Save the Leiden and autocorrelation analyses separately
 
 `write_locus_results()` preserves the original Manhattan analysis.
 `write_autocorrelation_results()` saves the independent ACF experiment with
 both label columns. Output directories must be new or empty.
 
 ```{r exports}
-write_locus_results(leiden_results, file.path(run_dir, "synthetic-leiden"))
-write_autocorrelation_results(acf_clustered, file.path(run_dir, "synthetic-autocorrelation"))
+write_locus_results(leiden_results, file.path(run_dir, "LCL-subset-leiden"))
+write_autocorrelation_results(acf_clustered, file.path(run_dir, "LCL-subset-autocorrelation"))
 if (params$run_lcl)
     write_autocorrelation_results(lcl_acf, file.path(run_dir, "LCL-autocorrelation"))
-knitr::kable(data.frame(file = list.files(file.path(run_dir, "synthetic-autocorrelation"))))
+knitr::kable(data.frame(file = list.files(file.path(run_dir, "LCL-subset-autocorrelation"))))
 ```
 
 The ACF export contains `autocorrelation.rds`, `reads.tsv`, `lags.tsv`, mean/SD/SEM
@@ -465,7 +539,7 @@ exports its attached ACF automatically under each locus's `autocorrelation/`
 subdirectory. To reload a standalone ACF result:
 
 ```{r reload}
-restored_acf <- readRDS(file.path(run_dir, "synthetic-autocorrelation", "autocorrelation.rds"))
+restored_acf <- readRDS(file.path(run_dir, "LCL-subset-autocorrelation", "autocorrelation.rds"))
 stopifnot(identical(assay(restored_acf), assay(acf_clustered)),
           identical(colData(restored_acf), colData(acf_clustered)))
 ```
